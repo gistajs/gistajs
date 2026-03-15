@@ -52,7 +52,7 @@ export async function createProject(
 
     return root
   } finally {
-    await rm(staging, { recursive: true, force: true })
+    await cleanupStaging(staging)
   }
 }
 
@@ -136,7 +136,20 @@ async function copyProject(source: string, destination: string) {
 
 function shouldFallbackToCopy(error: unknown) {
   let code = (error as NodeJS.ErrnoException | undefined)?.code
-  return code === 'EXDEV' || code === 'EPERM'
+  return code === 'EXDEV' || code === 'EPERM' || code === 'ENOTEMPTY'
+}
+
+async function cleanupStaging(root: string) {
+  try {
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    })
+  } catch {
+    // Temp cleanup should never turn a successful scaffold into a failure.
+  }
 }
 
 async function assertEmptyTarget(root: string) {
