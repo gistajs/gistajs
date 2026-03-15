@@ -1,4 +1,5 @@
 import {
+  cp,
   mkdtemp,
   mkdir,
   readdir,
@@ -38,7 +39,7 @@ export async function createProject(
 
     let extracted = await findExtractedRoot(extractRoot)
     await assertSafeProjectRoot(root)
-    await rename(extracted, root)
+    await copyProject(extracted, root)
     await rewritePackageName(root, basename(root))
 
     if (options.git !== false) {
@@ -116,6 +117,26 @@ async function rewritePackageName(root: string, projectName: string) {
     pkg.name = projectName
     await writeFile(path, `${JSON.stringify(pkg, null, 2)}\n`)
   }
+}
+
+async function copyProject(source: string, destination: string) {
+  try {
+    await rename(source, destination)
+    return
+  } catch (error) {
+    if (!shouldFallbackToCopy(error)) throw error
+  }
+
+  await cp(source, destination, {
+    recursive: true,
+    force: false,
+    errorOnExist: true,
+  })
+}
+
+function shouldFallbackToCopy(error: unknown) {
+  let code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === 'EXDEV' || code === 'EPERM'
 }
 
 async function assertEmptyTarget(root: string) {
