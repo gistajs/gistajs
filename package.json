@@ -1,1 +1,56 @@
-{"name":"gistajs","version":"0.0.0"}
+{
+  "name": "gistajs",
+  "version": "0.0.0",
+  "description": "Create Gista.js starter projects",
+  "keywords": [
+    "cli",
+    "gistajs",
+    "scaffold",
+    "starter"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Kenn Ejima",
+    "email": "kenn@users.noreply.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gistajs/gistajs.git"
+  },
+  "bin": {
+    "gistajs": "dist/bin.cjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc -b",
+    "prepublishOnly": "npm run typecheck && npm run build && npm run test -- --run",
+    "np": "np"
+  },
+  "dependencies": {
+    "tar": "^7.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "np": "^11.0.2",
+    "oxfmt": "^0.40.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
