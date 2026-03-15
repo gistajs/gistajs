@@ -50,7 +50,8 @@ export async function initGit(
     deps,
   )
 
-  for (let branch of starter.branches.slice(1)) {
+  for (let branch of starter.branches) {
+    if (branch === 'main') continue
     await git(root, ['branch', branch], deps)
   }
 
