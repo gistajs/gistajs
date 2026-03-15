@@ -86,7 +86,17 @@ async function extractStarter(archivePath: string, destination: string) {
   await tar.x({
     file: archivePath,
     cwd: destination,
-    strict: true,
+    strict: false,
+    onwarn: (code, message) => {
+      if (
+        code === 'TAR_ENTRY_INFO' &&
+        message.includes('stripping / from absolute linkpath')
+      ) {
+        return
+      }
+
+      throw new Error(message)
+    },
     onentry: (entry: ReadEntry) => {
       let normalized = entry.path.replace(/\\/g, '/')
 
