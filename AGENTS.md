@@ -60,4 +60,4 @@ pnpm test -- --run
 
 ## Final response note
 
-- When finishing a task, include a one-line commit message suggestion based on the full current uncommitted diff, not just the most recent change.
+- When finishing a task that produced new edits, include a one-line commit message suggestion based on the full current uncommitted diff, not just the most recent change.
