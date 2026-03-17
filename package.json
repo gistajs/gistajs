@@ -36,8 +36,8 @@
     "build": "tsup",
     "test": "vitest",
     "typecheck": "tsc -b",
-    "prepublishOnly": "npm run typecheck && npm run build && npm run test -- --run",
-    "np": "np"
+    "release:prepare": "pnpm typecheck && pnpm build && pnpm test -- --run",
+    "np": "pnpm release:prepare && np"
   },
   "dependencies": {
     "tar": "^7.5.1"

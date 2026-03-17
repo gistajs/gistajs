@@ -57,3 +57,7 @@ pnpm test -- --run
 - `createProject` runs `pnpm install` unless disabled.
 - `initGit` may prompt for git identity if none is configured.
 - Avoid overwriting unrelated local changes in the worktree.
+
+## Final response note
+
+- When finishing a task, include a one-line commit message suggestion based on the full current uncommitted diff, not just the most recent change.
