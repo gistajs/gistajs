@@ -4,33 +4,57 @@ import { createProject } from './create.js'
 import { promptForStarter } from './prompt.js'
 import type { CreateOptions } from './types.js'
 
-export async function runCli(argv = process.argv.slice(2)) {
+type CliDeps = {
+  loadCatalog: typeof loadCatalog
+  createProject: typeof createProject
+  promptForStarter: typeof promptForStarter
+  stdout: Pick<typeof console, 'log'>
+}
+
+const defaultDeps: CliDeps = {
+  loadCatalog,
+  createProject,
+  promptForStarter,
+  stdout: console,
+}
+
+class UsageError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UsageError'
+  }
+}
+
+export async function runCli(
+  argv = process.argv.slice(2),
+  deps: CliDeps = defaultDeps,
+) {
   let [command, ...rest] = argv
 
   if (!command || command === '--help' || command === '-h') {
-    printHelp()
+    deps.stdout.log(getHelpText())
     return
   }
 
   if (command !== 'create') {
-    throw new Error(`Unknown command: ${command}`)
+    throw new UsageError(`Unknown command: ${command}`)
   }
 
   let options = parseCreateArgs(rest)
-  let catalog = await loadCatalog(options.catalogUrl)
-  let starterName = options.starter || (await promptForStarter(catalog))
+  if (!options.projectName) {
+    throw new UsageError('Project name is required')
+  }
+
+  let catalog = await deps.loadCatalog(options.catalogUrl)
+  let starterName = options.starter || (await deps.promptForStarter(catalog))
   let starter = catalog.find((entry) => entry.slug === starterName)
 
   if (!starter) {
-    throw new Error(`Unknown starter: ${starterName}`)
+    throw new UsageError(`Unknown starter: ${starterName}`)
   }
 
-  if (!options.projectName) {
-    throw new Error('Project name is required')
-  }
-
-  let root = await createProject(starter, options)
-  console.log(`Created ${starter.slug} project in ${root}`)
+  let root = await deps.createProject(starter, options)
+  deps.stdout.log(`Created ${starter.slug} project in ${root}`)
 }
 
 export async function main() {
@@ -39,6 +63,9 @@ export async function main() {
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error)
     console.error(message)
+    if (error instanceof UsageError) {
+      console.error(getHelpText())
+    }
     process.exitCode = 1
   }
 }
@@ -60,7 +87,7 @@ export function parseCreateArgs(argv: string[]): CreateOptions {
     }
 
     if (arg === '--starter') {
-      if (!argv[index + 1]) throw new Error('--starter requires a value')
+      if (!argv[index + 1]) throw new UsageError('--starter requires a value')
       options.starter = argv[index + 1]
       index += 1
       continue
@@ -77,23 +104,29 @@ export function parseCreateArgs(argv: string[]): CreateOptions {
     }
 
     if (arg === '--catalog-url') {
-      if (!argv[index + 1]) throw new Error('--catalog-url requires a value')
+      if (!argv[index + 1]) {
+        throw new UsageError('--catalog-url requires a value')
+      }
       options.catalogUrl = argv[index + 1]
       index += 1
       continue
     }
 
-    throw new Error(`Unknown argument: ${arg}`)
+    throw new UsageError(`Unknown argument: ${arg}`)
   }
 
   return options
 }
 
-function printHelp() {
-  console.log(
-    [
-      'Usage:',
-      '  gistajs create <project-name> [--starter <slug>] [--no-install] [--no-git]',
-    ].join('\n'),
-  )
+function getHelpText() {
+  return [
+    'Usage:',
+    '  gistajs create <project-name> [--starter <slug>] [--no-install] [--no-git]',
+    '',
+    'Examples:',
+    '  gistajs create my-app',
+    '  gistajs create my-app --starter website',
+    '',
+    'Run `gistajs` with no arguments to show this help.',
+  ].join('\n')
 }

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import * as tar from 'tar'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCatalog } from '../src/catalog.js'
-import { parseCreateArgs } from '../src/cli.js'
+import { main, parseCreateArgs, runCli } from '../src/cli.js'
 import { createProject, getStarterTarballUrl } from '../src/create.js'
 
 let tempRoots: string[] = []
@@ -56,6 +56,73 @@ describe('parseCreateArgs', () => {
     expect(() => parseCreateArgs(['my-app', '--starter'])).toThrow(
       '--starter requires a value',
     )
+  })
+})
+
+describe('runCli', () => {
+  it('prints help for bare invocation without loading the catalog', async () => {
+    let loadCatalog = vi.fn()
+    let stdout = { log: vi.fn() }
+
+    await runCli([], {
+      loadCatalog,
+      createProject: vi.fn(),
+      promptForStarter: vi.fn(),
+      stdout,
+    })
+
+    expect(loadCatalog).not.toHaveBeenCalled()
+    expect(stdout.log).toHaveBeenCalledOnce()
+    expect(stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
+    expect(stdout.log.mock.calls[0]?.[0]).toContain('gistajs create my-app')
+  })
+
+  it('prints help for --help without loading the catalog', async () => {
+    let loadCatalog = vi.fn()
+    let stdout = { log: vi.fn() }
+
+    await runCli(['--help'], {
+      loadCatalog,
+      createProject: vi.fn(),
+      promptForStarter: vi.fn(),
+      stdout,
+    })
+
+    expect(loadCatalog).not.toHaveBeenCalled()
+    expect(stdout.log).toHaveBeenCalledOnce()
+    expect(stdout.log.mock.calls[0]?.[0]).toContain('Examples:')
+  })
+
+  it('rejects create without a project name before any side effects', async () => {
+    let loadCatalog = vi.fn()
+    let promptForStarter = vi.fn()
+
+    await expect(
+      runCli(['create'], {
+        loadCatalog,
+        createProject: vi.fn(),
+        promptForStarter,
+        stdout: { log: vi.fn() },
+      }),
+    ).rejects.toThrow('Project name is required')
+
+    expect(loadCatalog).not.toHaveBeenCalled()
+    expect(promptForStarter).not.toHaveBeenCalled()
+  })
+
+  it('rejects unknown commands before loading the catalog', async () => {
+    let loadCatalog = vi.fn()
+
+    await expect(
+      runCli(['bogus'], {
+        loadCatalog,
+        createProject: vi.fn(),
+        promptForStarter: vi.fn(),
+        stdout: { log: vi.fn() },
+      }),
+    ).rejects.toThrow('Unknown command: bogus')
+
+    expect(loadCatalog).not.toHaveBeenCalled()
   })
 })
 
@@ -130,5 +197,34 @@ describe('git identity prompts', () => {
     })
 
     expect(promptForGitIdentity).toHaveBeenCalled()
+  })
+})
+
+describe('main', () => {
+  it('prints usage after usage errors', async () => {
+    let error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let previousArgv = process.argv
+    let previousExitCode = process.exitCode
+    process.argv = ['node', 'gistajs', 'create']
+    process.exitCode = undefined
+
+    try {
+      await main()
+    } finally {
+      process.argv = previousArgv
+    }
+
+    expect(process.exitCode).toBe(1)
+    expect(error).toHaveBeenNthCalledWith(1, 'Project name is required')
+    expect(error).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('Usage:'),
+    )
+    expect(error).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('gistajs create my-app'),
+    )
+
+    process.exitCode = previousExitCode
   })
 })
