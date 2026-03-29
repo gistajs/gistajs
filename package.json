@@ -34,9 +34,10 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc -b",
-    "release:prepare": "pnpm typecheck && pnpm build && pnpm test -- --run",
+    "release:prepare": "pnpm typecheck && pnpm build && pnpm test",
     "np": "pnpm release:prepare && np"
   },
   "dependencies": {
