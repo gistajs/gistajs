@@ -14,7 +14,8 @@ import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import type { ReadEntry } from 'tar'
 import * as tar from 'tar'
-import { initGit, run } from './git.js'
+import { initGit } from './git.js'
+import { run } from './subprocess.js'
 import type { CreateOptions, StarterSpec } from './types.js'
 
 export async function createProject(

@@ -1,5 +1,6 @@
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { promptForGitIdentity } from './prompt.js'
+import { run } from './subprocess.js'
 import type { StarterSpec } from './types.js'
 
 type GitIdentity = {
@@ -87,22 +88,4 @@ function readGitConfig(cwd: string, key: string) {
   } catch {
     return ''
   }
-}
-
-export async function run(command: string, args: string[], cwd: string) {
-  await new Promise<void>((resolve, reject) => {
-    let child = spawn(command, args, {
-      cwd,
-      stdio: 'inherit',
-    })
-
-    child.once('error', reject)
-    child.once('exit', (code) => {
-      if (code === 0) resolve()
-      else
-        reject(
-          new Error(`${command} ${args.join(' ')} exited with code ${code}`),
-        )
-    })
-  })
 }

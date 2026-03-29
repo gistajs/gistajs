@@ -13,3 +13,10 @@ export type CreateOptions = {
   git?: boolean
   catalogUrl?: string
 }
+
+export type DiffOptions = {
+  starter?: string
+  fromReleaseKey?: string
+  toReleaseKey?: string
+  catalogUrl?: string
+}

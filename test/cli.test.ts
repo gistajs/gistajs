@@ -4,8 +4,13 @@ import { join } from 'node:path'
 import * as tar from 'tar'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCatalog } from '../src/catalog.js'
-import { main, parseCreateArgs, runCli } from '../src/cli.js'
+import { main, parseCreateArgs, parseDiffArgs, runCli } from '../src/cli.js'
 import { createProject, getStarterTarballUrl } from '../src/create.js'
+import {
+  diffStarter,
+  getStarterRepoUrl,
+  resolveStarterTagName,
+} from '../src/diff.js'
 
 let tempRoots: string[] = []
 let sampleCatalog = parseCatalog([
@@ -59,6 +64,24 @@ describe('parseCreateArgs', () => {
   })
 })
 
+describe('parseDiffArgs', () => {
+  it('parses starter release keys', () => {
+    expect(parseDiffArgs(['auth', '2026-03-28-001', '2026-03-29-001'])).toEqual(
+      {
+        starter: 'auth',
+        fromReleaseKey: '2026-03-28-001',
+        toReleaseKey: '2026-03-29-001',
+      },
+    )
+  })
+
+  it('rejects missing catalog url values', () => {
+    expect(() => parseDiffArgs(['auth', 'a', 'b', '--catalog-url'])).toThrow(
+      '--catalog-url requires a value',
+    )
+  })
+})
+
 describe('runCli', () => {
   it('prints help for bare invocation without loading the catalog', async () => {
     let loadCatalog = vi.fn()
@@ -67,6 +90,7 @@ describe('runCli', () => {
     await runCli([], {
       loadCatalog,
       createProject: vi.fn(),
+      diffStarter: vi.fn(),
       promptForStarter: vi.fn(),
       stdout,
     })
@@ -84,6 +108,7 @@ describe('runCli', () => {
     await runCli(['--help'], {
       loadCatalog,
       createProject: vi.fn(),
+      diffStarter: vi.fn(),
       promptForStarter: vi.fn(),
       stdout,
     })
@@ -101,6 +126,7 @@ describe('runCli', () => {
       runCli(['create'], {
         loadCatalog,
         createProject: vi.fn(),
+        diffStarter: vi.fn(),
         promptForStarter,
         stdout: { log: vi.fn() },
       }),
@@ -117,12 +143,51 @@ describe('runCli', () => {
       runCli(['bogus'], {
         loadCatalog,
         createProject: vi.fn(),
+        diffStarter: vi.fn(),
         promptForStarter: vi.fn(),
         stdout: { log: vi.fn() },
       }),
     ).rejects.toThrow('Unknown command: bogus')
 
     expect(loadCatalog).not.toHaveBeenCalled()
+  })
+
+  it('rejects diff without all required args before any side effects', async () => {
+    let loadCatalog = vi.fn()
+
+    await expect(
+      runCli(['diff', 'auth', '2026-03-28-001'], {
+        loadCatalog,
+        createProject: vi.fn(),
+        diffStarter: vi.fn(),
+        promptForStarter: vi.fn(),
+        stdout: { log: vi.fn() },
+      }),
+    ).rejects.toThrow('To release key is required')
+
+    expect(loadCatalog).not.toHaveBeenCalled()
+  })
+
+  it('dispatches diff with the resolved starter and args', async () => {
+    let loadCatalog = vi.fn().mockResolvedValue(sampleCatalog)
+    let diffStarterMock = vi.fn().mockResolvedValue(' package.json | 2 +-')
+    let stdout = { log: vi.fn() }
+
+    await runCli(['diff', 'auth', '2026-03-28-001', '2026-03-29-001'], {
+      loadCatalog,
+      createProject: vi.fn(),
+      diffStarter: diffStarterMock,
+      promptForStarter: vi.fn(),
+      stdout,
+    })
+
+    expect(loadCatalog).toHaveBeenCalledOnce()
+    expect(diffStarterMock).toHaveBeenCalledWith(sampleCatalog[2], {
+      starter: 'auth',
+      fromReleaseKey: '2026-03-28-001',
+      toReleaseKey: '2026-03-29-001',
+    })
+    expect(stdout.log).toHaveBeenCalledWith(' package.json | 2 +-')
   })
 })
 
@@ -178,6 +243,87 @@ describe('createProject', () => {
       await readFile(join(projectRoot, 'package.json'), 'utf8'),
     )
     expect(pkg.name).toBe('demo')
+  })
+})
+
+describe('diffStarter', () => {
+  it('resolves starter tag names with the starter prefix', () => {
+    expect(resolveStarterTagName('auth', '2026-03-29-001')).toBe(
+      'auth/2026-03-29-001',
+    )
+  })
+
+  it('builds the starter repo url from the catalog entry', () => {
+    expect(getStarterRepoUrl(sampleCatalog[2]!)).toBe(
+      'https://github.com/gistajs/auth.git',
+    )
+  })
+
+  it('fetches both tags and diffs them by tag ref', async () => {
+    let run = vi.fn().mockResolvedValue(undefined)
+    let runOutput = vi.fn().mockResolvedValue(' package.json | 2 +-')
+    let rm = vi.fn().mockResolvedValue(undefined)
+
+    let output = await diffStarter(
+      sampleCatalog[2]!,
+      {
+        starter: 'auth',
+        fromReleaseKey: '2026-03-28-001',
+        toReleaseKey: '2026-03-29-001',
+      },
+      {
+        mkdtemp: vi.fn().mockResolvedValue('/tmp/gistajs-diff-test'),
+        rm,
+        run,
+        runOutput,
+      },
+    )
+
+    expect(output).toBe(' package.json | 2 +-')
+    expect(run.mock.calls).toEqual([
+      ['git', ['init', '-q'], '/tmp/gistajs-diff-test'],
+      [
+        'git',
+        ['remote', 'add', 'origin', 'https://github.com/gistajs/auth.git'],
+        '/tmp/gistajs-diff-test',
+      ],
+      [
+        'git',
+        [
+          'fetch',
+          '--quiet',
+          '--no-tags',
+          'origin',
+          'refs/tags/auth/2026-03-28-001:refs/tags/auth/2026-03-28-001',
+        ],
+        '/tmp/gistajs-diff-test',
+      ],
+      [
+        'git',
+        [
+          'fetch',
+          '--quiet',
+          '--no-tags',
+          'origin',
+          'refs/tags/auth/2026-03-29-001:refs/tags/auth/2026-03-29-001',
+        ],
+        '/tmp/gistajs-diff-test',
+      ],
+    ])
+    expect(runOutput).toHaveBeenCalledWith(
+      'git',
+      [
+        'diff',
+        '--stat',
+        'refs/tags/auth/2026-03-28-001',
+        'refs/tags/auth/2026-03-29-001',
+      ],
+      '/tmp/gistajs-diff-test',
+    )
+    expect(rm).toHaveBeenCalledWith('/tmp/gistajs-diff-test', {
+      recursive: true,
+      force: true,
+    })
   })
 })
 

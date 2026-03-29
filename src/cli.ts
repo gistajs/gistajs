@@ -1,12 +1,14 @@
 import process from 'node:process'
 import { loadCatalog } from './catalog.js'
 import { createProject } from './create.js'
+import { diffStarter } from './diff.js'
 import { promptForStarter } from './prompt.js'
-import type { CreateOptions } from './types.js'
+import type { CreateOptions, DiffOptions } from './types.js'
 
 type CliDeps = {
   loadCatalog: typeof loadCatalog
   createProject: typeof createProject
+  diffStarter: typeof diffStarter
   promptForStarter: typeof promptForStarter
   stdout: Pick<typeof console, 'log'>
 }
@@ -14,6 +16,7 @@ type CliDeps = {
 const defaultDeps: CliDeps = {
   loadCatalog,
   createProject,
+  diffStarter,
   promptForStarter,
   stdout: console,
 }
@@ -36,25 +39,53 @@ export async function runCli(
     return
   }
 
-  if (command !== 'create') {
-    throw new UsageError(`Unknown command: ${command}`)
+  if (command === 'create') {
+    let options = parseCreateArgs(rest)
+    if (!options.projectName) {
+      throw new UsageError('Project name is required')
+    }
+
+    let catalog = await deps.loadCatalog(options.catalogUrl)
+    let starterName = options.starter || (await deps.promptForStarter(catalog))
+    let starter = catalog.find((entry) => entry.slug === starterName)
+
+    if (!starter) {
+      throw new UsageError(`Unknown starter: ${starterName}`)
+    }
+
+    let root = await deps.createProject(starter, options)
+    deps.stdout.log(`Created ${starter.slug} project in ${root}`)
+    return
   }
 
-  let options = parseCreateArgs(rest)
-  if (!options.projectName) {
-    throw new UsageError('Project name is required')
+  if (command === 'diff') {
+    let options = parseDiffArgs(rest)
+
+    if (!options.starter) {
+      throw new UsageError('Starter is required')
+    }
+
+    if (!options.fromReleaseKey) {
+      throw new UsageError('From release key is required')
+    }
+
+    if (!options.toReleaseKey) {
+      throw new UsageError('To release key is required')
+    }
+
+    let catalog = await deps.loadCatalog(options.catalogUrl)
+    let starter = catalog.find((entry) => entry.slug === options.starter)
+
+    if (!starter) {
+      throw new UsageError(`Unknown starter: ${options.starter}`)
+    }
+
+    let output = await deps.diffStarter(starter, options)
+    deps.stdout.log(output.trimEnd())
+    return
   }
 
-  let catalog = await deps.loadCatalog(options.catalogUrl)
-  let starterName = options.starter || (await deps.promptForStarter(catalog))
-  let starter = catalog.find((entry) => entry.slug === starterName)
-
-  if (!starter) {
-    throw new UsageError(`Unknown starter: ${starterName}`)
-  }
-
-  let root = await deps.createProject(starter, options)
-  deps.stdout.log(`Created ${starter.slug} project in ${root}`)
+  throw new UsageError(`Unknown command: ${command}`)
 }
 
 export async function main() {
@@ -118,14 +149,54 @@ export function parseCreateArgs(argv: string[]): CreateOptions {
   return options
 }
 
+export function parseDiffArgs(argv: string[]): DiffOptions {
+  let options: DiffOptions = {}
+
+  for (let index = 0; index < argv.length; index += 1) {
+    let arg = argv[index]
+
+    if (!arg) continue
+
+    if (!arg.startsWith('--') && !options.starter) {
+      options.starter = arg
+      continue
+    }
+
+    if (!arg.startsWith('--') && !options.fromReleaseKey) {
+      options.fromReleaseKey = arg
+      continue
+    }
+
+    if (!arg.startsWith('--') && !options.toReleaseKey) {
+      options.toReleaseKey = arg
+      continue
+    }
+
+    if (arg === '--catalog-url') {
+      if (!argv[index + 1]) {
+        throw new UsageError('--catalog-url requires a value')
+      }
+      options.catalogUrl = argv[index + 1]
+      index += 1
+      continue
+    }
+
+    throw new UsageError(`Unknown argument: ${arg}`)
+  }
+
+  return options
+}
+
 function getHelpText() {
   return [
     'Usage:',
     '  gistajs create <project-name> [--starter <slug>] [--no-install] [--no-git]',
+    '  gistajs diff <starter> <from-release-key> <to-release-key>',
     '',
     'Examples:',
     '  gistajs create my-app',
     '  gistajs create my-app --starter website',
+    '  gistajs diff auth 2026-03-28-001 2026-03-29-001',
     '',
     'Run `gistajs` with no arguments to show this help.',
   ].join('\n')
