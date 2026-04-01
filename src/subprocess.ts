@@ -11,7 +11,9 @@ export async function run(command: string, args: string[], cwd: string) {
     child.once('exit', (code) => {
       if (code === 0) resolve()
       else {
-        reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`))
+        reject(
+          new Error(`${command} ${args.join(' ')} exited with code ${code}`),
+        )
       }
     })
   })

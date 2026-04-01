@@ -1,5 +1,6 @@
 import process from 'node:process'
 import readline from 'node:readline/promises'
+import { c } from './color.js'
 import type { StarterSpec } from './types.js'
 
 export async function promptForStarter(starters: StarterSpec[]) {
@@ -8,11 +9,13 @@ export async function promptForStarter(starters: StarterSpec[]) {
     let options = starters
       .map(
         (starter, index) =>
-          `${index + 1}. ${starter.slug} - ${starter.description}`,
+          `  ${c.dim(`${index + 1}.`)} ${c.slug(starter.slug)} ${c.dim('—')} ${starter.description}`,
       )
       .join('\n')
 
-    let answer = await rl.question(`Choose a starter:\n${options}\n> `)
+    let answer = await rl.question(
+      `${c.prompt('Choose a starter:')}\n${options}\n${c.dim('>')} `,
+    )
     let index = Number.parseInt(answer.trim(), 10) - 1
     let starter = starters[index]
 
@@ -29,11 +32,13 @@ export async function promptForGitIdentity() {
 
   try {
     console.log(
-      'Before I make the first commit, Git needs a name and email to attach to it.',
+      c.dim(
+        'Before I make the first commit, Git needs a name and email to attach to it.',
+      ),
     )
 
-    let name = (await rl.question('Your name: ')).trim()
-    let email = (await rl.question('Your email: ')).trim()
+    let name = (await rl.question(c.prompt('Your name: '))).trim()
+    let email = (await rl.question(c.prompt('Your email: '))).trim()
 
     if (!name) throw new Error('Name is required to make the first commit')
     if (!email) throw new Error('Email is required to make the first commit')
@@ -57,6 +62,6 @@ function createPrompt() {
 }
 
 async function confirm(rl: readline.Interface, message: string) {
-  let answer = (await rl.question(message)).trim().toLowerCase()
+  let answer = (await rl.question(c.dim(message))).trim().toLowerCase()
   return answer === 'y' || answer === 'yes'
 }

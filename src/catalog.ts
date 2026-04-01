@@ -1,7 +1,6 @@
 import type { StarterSpec } from './types.js'
 
-export const DEFAULT_CATALOG_URL =
-  'https://gistajs.com/manifests/starters.json'
+export const DEFAULT_CATALOG_URL = 'https://gistajs.com/manifests/starters.json'
 
 export async function loadCatalog(url = DEFAULT_CATALOG_URL) {
   let response = await fetch(url)

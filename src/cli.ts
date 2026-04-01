@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { loadCatalog } from './catalog.js'
+import { c, logo } from './color.js'
 import { createProject } from './create.js'
 import { diffStarter } from './diff.js'
 import { promptForStarter } from './prompt.js'
@@ -39,6 +40,11 @@ export async function runCli(
     return
   }
 
+  if (command === 'logo') {
+    deps.stdout.log('\n' + logo() + '\n')
+    return
+  }
+
   if (command === 'create') {
     let options = parseCreateArgs(rest)
     if (!options.projectName) {
@@ -54,7 +60,9 @@ export async function runCli(
     }
 
     let root = await deps.createProject(starter, options)
-    deps.stdout.log(`Created ${starter.slug} project in ${root}`)
+    deps.stdout.log(
+      `\n  ${c.brand('gistajs')} ${c.success('Created')} ${c.slug(starter.slug)} project in ${c.path(root)}\n`,
+    )
     return
   }
 
@@ -93,7 +101,7 @@ export async function main() {
     await runCli()
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error)
-    console.error(message)
+    console.error(`${c.errorLabel('error:')} ${c.error(message)}`)
     if (error instanceof UsageError) {
       console.error(getHelpText())
     }
@@ -189,15 +197,17 @@ export function parseDiffArgs(argv: string[]): DiffOptions {
 
 function getHelpText() {
   return [
-    'Usage:',
-    '  gistajs create <project-name> [--starter <slug>] [--no-install] [--no-git]',
-    '  gistajs diff <starter> <from-release-key> <to-release-key>',
     '',
-    'Examples:',
-    '  gistajs create my-app',
-    '  gistajs create my-app --starter website',
-    '  gistajs diff auth 2026-03-28-001 2026-03-29-001',
+    `  ${c.brand('gistajs')} ${c.dim('— scaffold Gista.js starter projects')}`,
     '',
-    'Run `gistajs` with no arguments to show this help.',
+    `  ${c.bold('Usage:')}`,
+    `    ${c.dim('$')} ${c.bold('gistajs create')} <project-name> [--starter <slug>] [--no-install] [--no-git]`,
+    `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key>`,
+    '',
+    `  ${c.bold('Examples:')}`,
+    `    ${c.dim('$')} gistajs create my-app`,
+    `    ${c.dim('$')} gistajs create my-app --starter website`,
+    `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
+    '',
   ].join('\n')
 }

@@ -361,11 +361,11 @@ describe('main', () => {
     }
 
     expect(process.exitCode).toBe(1)
-    expect(error).toHaveBeenNthCalledWith(1, 'Project name is required')
     expect(error).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('Usage:'),
+      1,
+      expect.stringContaining('Project name is required'),
     )
+    expect(error).toHaveBeenNthCalledWith(2, expect.stringContaining('Usage:'))
     expect(error).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining('gistajs create my-app'),

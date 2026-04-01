@@ -67,7 +67,13 @@ async function fetchTag(
   try {
     await git(
       cwd,
-      ['fetch', '--quiet', '--no-tags', 'origin', `refs/tags/${tag}:refs/tags/${tag}`],
+      [
+        'fetch',
+        '--quiet',
+        '--no-tags',
+        'origin',
+        `refs/tags/${tag}:refs/tags/${tag}`,
+      ],
       deps,
     )
   } catch (error) {
