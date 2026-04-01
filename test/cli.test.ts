@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import * as tar from 'tar'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseCatalog } from '../src/catalog.js'
+import type { CliDeps } from '../src/cli.js'
 import { main, parseCreateArgs, parseDiffArgs, runCli } from '../src/cli.js'
 import { createProject, getStarterTarballUrl } from '../src/create.js'
 import {
@@ -94,116 +95,75 @@ describe('parseDiffArgs', () => {
 
 describe('runCli', () => {
   it('prints help for bare invocation without loading the catalog', async () => {
-    let loadCatalog = vi.fn()
-    let stdout = { log: vi.fn() }
+    let deps = makeCliDeps()
 
-    await runCli([], {
-      loadCatalog,
-      createProject: vi.fn(),
-      diffStarter: vi.fn(),
-      promptForStarter: vi.fn(),
-      promptConfirm: vi.fn(),
-      stdout,
-    })
+    await runCli([], deps)
 
-    expect(loadCatalog).not.toHaveBeenCalled()
-    expect(stdout.log).toHaveBeenCalledOnce()
-    expect(stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
-    expect(stdout.log.mock.calls[0]?.[0]).toContain('gistajs create my-app')
+    expect(deps.loadCatalog).not.toHaveBeenCalled()
+    expect(deps.stdout.log).toHaveBeenCalledOnce()
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
+      'gistajs create my-app',
+    )
   })
 
   it('prints help for --help without loading the catalog', async () => {
-    let loadCatalog = vi.fn()
-    let stdout = { log: vi.fn() }
+    let deps = makeCliDeps()
 
-    await runCli(['--help'], {
-      loadCatalog,
-      createProject: vi.fn(),
-      diffStarter: vi.fn(),
-      promptForStarter: vi.fn(),
-      promptConfirm: vi.fn(),
-      stdout,
-    })
+    await runCli(['--help'], deps)
 
-    expect(loadCatalog).not.toHaveBeenCalled()
-    expect(stdout.log).toHaveBeenCalledOnce()
-    expect(stdout.log.mock.calls[0]?.[0]).toContain('Examples:')
+    expect(deps.loadCatalog).not.toHaveBeenCalled()
+    expect(deps.stdout.log).toHaveBeenCalledOnce()
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Examples:')
   })
 
   it('rejects create without a project name before any side effects', async () => {
-    let loadCatalog = vi.fn()
-    let promptForStarter = vi.fn()
+    let deps = makeCliDeps()
 
-    await expect(
-      runCli(['create'], {
-        loadCatalog,
-        createProject: vi.fn(),
-        diffStarter: vi.fn(),
-        promptForStarter,
-        promptConfirm: vi.fn(),
-        stdout: { log: vi.fn() },
-      }),
-    ).rejects.toThrow('Project name is required')
+    await expect(runCli(['create'], deps)).rejects.toThrow(
+      'Project name is required',
+    )
 
-    expect(loadCatalog).not.toHaveBeenCalled()
-    expect(promptForStarter).not.toHaveBeenCalled()
+    expect(deps.loadCatalog).not.toHaveBeenCalled()
+    expect(deps.promptForStarter).not.toHaveBeenCalled()
   })
 
   it('rejects unknown commands before loading the catalog', async () => {
-    let loadCatalog = vi.fn()
+    let deps = makeCliDeps()
 
-    await expect(
-      runCli(['bogus'], {
-        loadCatalog,
-        createProject: vi.fn(),
-        diffStarter: vi.fn(),
-        promptForStarter: vi.fn(),
-        promptConfirm: vi.fn(),
-        stdout: { log: vi.fn() },
-      }),
-    ).rejects.toThrow('Unknown command: bogus')
+    await expect(runCli(['bogus'], deps)).rejects.toThrow(
+      'Unknown command: bogus',
+    )
 
-    expect(loadCatalog).not.toHaveBeenCalled()
+    expect(deps.loadCatalog).not.toHaveBeenCalled()
   })
 
   it('rejects diff without all required args before any side effects', async () => {
-    let loadCatalog = vi.fn()
+    let deps = makeCliDeps()
 
     await expect(
-      runCli(['diff', 'auth', '2026-03-28-001'], {
-        loadCatalog,
-        createProject: vi.fn(),
-        diffStarter: vi.fn(),
-        promptForStarter: vi.fn(),
-        promptConfirm: vi.fn(),
-        stdout: { log: vi.fn() },
-      }),
+      runCli(['diff', 'auth', '2026-03-28-001'], deps),
     ).rejects.toThrow('To release key is required')
 
-    expect(loadCatalog).not.toHaveBeenCalled()
+    expect(deps.loadCatalog).not.toHaveBeenCalled()
   })
 
   it('dispatches diff with the resolved starter and args', async () => {
-    let loadCatalog = vi.fn().mockResolvedValue(sampleCatalog)
     let diffStarterMock = vi.fn().mockResolvedValue(' package.json | 2 +-')
-    let stdout = { log: vi.fn() }
-
-    await runCli(['diff', 'auth', '2026-03-28-001', '2026-03-29-001'], {
-      loadCatalog,
-      createProject: vi.fn(),
+    let deps = makeCliDeps({
+      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
       diffStarter: diffStarterMock,
-      promptForStarter: vi.fn(),
-      promptConfirm: vi.fn(),
-      stdout,
     })
 
-    expect(loadCatalog).toHaveBeenCalledOnce()
+    await runCli(['diff', 'auth', '2026-03-28-001', '2026-03-29-001'], deps)
+
+    expect(deps.loadCatalog).toHaveBeenCalledOnce()
     expect(diffStarterMock).toHaveBeenCalledWith(sampleCatalog[2], {
       starter: 'auth',
       fromReleaseKey: '2026-03-28-001',
       toReleaseKey: '2026-03-29-001',
     })
-    expect(stdout.log).toHaveBeenCalledWith(' package.json | 2 +-')
+    expect(deps.stdout.log).toHaveBeenCalledWith(' package.json | 2 +-')
   })
 })
 
@@ -223,44 +183,153 @@ describe('getStarterTarballUrl', () => {
 
 describe('createProject', () => {
   it('extracts a starter archive and rewrites the package name', async () => {
-    let root = await mkdtemp(join(tmpdir(), 'gistajs-test-'))
-    tempRoots.push(root)
-
-    let sourceRoot = join(root, 'source', 'gistajs-website-dev')
-    await mkdir(sourceRoot, { recursive: true })
-    await writeFile(
-      join(sourceRoot, 'package.json'),
-      `${JSON.stringify({ name: 'website' }, null, 2)}\n`,
-    )
-
-    let archivePath = join(root, 'website.tgz')
-    await tar.c(
-      {
-        gzip: true,
-        cwd: join(root, 'source'),
-        file: archivePath,
-      },
-      ['gistajs-website-dev'],
-    )
-
-    let bytes = await readFile(archivePath)
-    let response = new Response(new Blob([bytes]))
-    globalThis.fetch = async () => response
-
+    let root = await prepareStarterArchive()
     let projectRoot = join(root, 'demo')
-    await createProject(sampleCatalog[0]!, {
-      projectName: 'demo',
-      targetDir: projectRoot,
-      install: false,
-      git: false,
-    })
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: false,
+        git: false,
+      },
+      { initGit: vi.fn(), run: vi.fn() },
+    )
 
     let pkg = JSON.parse(
       await readFile(join(projectRoot, 'package.json'), 'utf8'),
     )
     expect(pkg.name).toBe('demo')
   })
+
+  it('prefers corepack pnpm for dependency installation', async () => {
+    let root = await prepareStarterArchive()
+    let run = vi.fn().mockResolvedValue(undefined)
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        run,
+      },
+    )
+
+    expect(run).toHaveBeenCalledWith(
+      'corepack',
+      ['pnpm', 'install'],
+      projectRoot,
+    )
+  })
+
+  it('falls back to global pnpm when corepack is unavailable', async () => {
+    let root = await prepareStarterArchive()
+    let run = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('missing'), { code: 'ENOENT' }),
+      )
+      .mockResolvedValueOnce(undefined)
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        run,
+      },
+    )
+
+    expect(run.mock.calls).toEqual([
+      ['corepack', ['pnpm', 'install'], projectRoot],
+      ['pnpm', ['install'], projectRoot],
+    ])
+  })
+
+  it('shows a clear error when neither corepack nor pnpm is available', async () => {
+    let root = await prepareStarterArchive()
+    let run = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('missing'), { code: 'ENOENT' }),
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error('missing'), { code: 'ENOENT' }),
+      )
+    let projectRoot = join(root, 'demo')
+
+    await expect(
+      createProject(
+        sampleCatalog[0]!,
+        {
+          projectName: 'demo',
+          targetDir: projectRoot,
+          install: true,
+          git: false,
+        },
+        {
+          initGit: vi.fn(),
+          run,
+        },
+      ),
+    ).rejects.toThrow(
+      'Could not install dependencies because neither corepack nor pnpm is available.',
+    )
+  })
 })
+
+function makeCliDeps(overrides: Partial<CliDeps> = {}) {
+  return {
+    loadCatalog: vi.fn(),
+    createProject: vi.fn(),
+    diffStarter: vi.fn(),
+    promptForStarter: vi.fn(),
+    promptConfirm: vi.fn(),
+    stdout: { log: vi.fn() },
+    ...overrides,
+  } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
+}
+
+async function prepareStarterArchive() {
+  let root = await mkdtemp(join(tmpdir(), 'gistajs-test-'))
+  tempRoots.push(root)
+
+  let sourceRoot = join(root, 'source', 'gistajs-website-dev')
+  await mkdir(sourceRoot, { recursive: true })
+  await writeFile(
+    join(sourceRoot, 'package.json'),
+    `${JSON.stringify({ name: 'website' }, null, 2)}\n`,
+  )
+
+  let archivePath = join(root, 'website.tgz')
+  await tar.c(
+    {
+      gzip: true,
+      cwd: join(root, 'source'),
+      file: archivePath,
+    },
+    ['gistajs-website-dev'],
+  )
+
+  let bytes = await readFile(archivePath)
+  let response = new Response(new Blob([bytes]))
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
+
+  return root
+}
 
 describe('diffStarter', () => {
   it('resolves starter tag names with the starter prefix', () => {

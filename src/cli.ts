@@ -6,7 +6,7 @@ import { diffStarter } from './diff.js'
 import { promptConfirm, promptForStarter } from './prompt.js'
 import type { CreateOptions, DiffOptions } from './types.js'
 
-type CliDeps = {
+export type CliDeps = {
   loadCatalog: typeof loadCatalog
   createProject: typeof createProject
   diffStarter: typeof diffStarter

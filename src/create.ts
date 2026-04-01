@@ -18,9 +18,20 @@ import { initGit } from './git.js'
 import { run } from './subprocess.js'
 import type { CreateOptions, StarterSpec } from './types.js'
 
+type CreateProjectDeps = {
+  initGit: typeof initGit
+  run: typeof run
+}
+
+const defaultDeps: CreateProjectDeps = {
+  initGit,
+  run,
+}
+
 export async function createProject(
   starter: StarterSpec,
   options: CreateOptions,
+  deps: CreateProjectDeps = defaultDeps,
 ) {
   let root = resolve(
     process.cwd(),
@@ -44,11 +55,11 @@ export async function createProject(
     await rewritePackageName(root, basename(root))
 
     if (options.git !== false) {
-      await initGit(root, starter)
+      await deps.initGit(root, starter)
     }
 
     if (options.install !== false) {
-      await run('pnpm', ['install'], root)
+      await installDependencies(root, deps.run)
     }
 
     return root
@@ -128,6 +139,33 @@ async function rewritePackageName(root: string, projectName: string) {
     pkg.name = projectName
     await writeFile(path, `${JSON.stringify(pkg, null, 2)}\n`)
   }
+}
+
+async function installDependencies(root: string, runCommand: typeof run) {
+  try {
+    await runCommand('corepack', ['pnpm', 'install'], root)
+    return
+  } catch (error) {
+    if (!isCommandNotFound(error)) {
+      throw error
+    }
+  }
+
+  try {
+    await runCommand('pnpm', ['install'], root)
+  } catch (error) {
+    if (!isCommandNotFound(error)) {
+      throw error
+    }
+
+    throw new Error(
+      'Could not install dependencies because neither corepack nor pnpm is available. Install Node.js with corepack enabled, or install pnpm and rerun the command.',
+    )
+  }
+}
+
+function isCommandNotFound(error: unknown) {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
 }
 
 async function copyProject(source: string, destination: string) {
