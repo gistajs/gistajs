@@ -53,7 +53,6 @@ describe('parseCreateArgs', () => {
       projectName: 'my-app',
       starter: 'db',
       install: false,
-      git: true,
     })
   })
 
@@ -103,6 +102,7 @@ describe('runCli', () => {
       createProject: vi.fn(),
       diffStarter: vi.fn(),
       promptForStarter: vi.fn(),
+      promptConfirm: vi.fn(),
       stdout,
     })
 
@@ -121,6 +121,7 @@ describe('runCli', () => {
       createProject: vi.fn(),
       diffStarter: vi.fn(),
       promptForStarter: vi.fn(),
+      promptConfirm: vi.fn(),
       stdout,
     })
 
@@ -139,6 +140,7 @@ describe('runCli', () => {
         createProject: vi.fn(),
         diffStarter: vi.fn(),
         promptForStarter,
+        promptConfirm: vi.fn(),
         stdout: { log: vi.fn() },
       }),
     ).rejects.toThrow('Project name is required')
@@ -156,6 +158,7 @@ describe('runCli', () => {
         createProject: vi.fn(),
         diffStarter: vi.fn(),
         promptForStarter: vi.fn(),
+        promptConfirm: vi.fn(),
         stdout: { log: vi.fn() },
       }),
     ).rejects.toThrow('Unknown command: bogus')
@@ -172,6 +175,7 @@ describe('runCli', () => {
         createProject: vi.fn(),
         diffStarter: vi.fn(),
         promptForStarter: vi.fn(),
+        promptConfirm: vi.fn(),
         stdout: { log: vi.fn() },
       }),
     ).rejects.toThrow('To release key is required')
@@ -189,6 +193,7 @@ describe('runCli', () => {
       createProject: vi.fn(),
       diffStarter: diffStarterMock,
       promptForStarter: vi.fn(),
+      promptConfirm: vi.fn(),
       stdout,
     })
 

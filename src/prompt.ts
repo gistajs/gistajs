@@ -54,6 +54,17 @@ export async function promptForGitIdentity() {
   }
 }
 
+export async function promptConfirm(message: string, defaultYes = true) {
+  let rl = createPrompt()
+  try {
+    let answer = (await rl.question(c.prompt(message))).trim().toLowerCase()
+    if (answer === '') return defaultYes
+    return answer === 'y' || answer === 'yes'
+  } finally {
+    rl.close()
+  }
+}
+
 function createPrompt() {
   return readline.createInterface({
     input: process.stdin,

@@ -3,7 +3,7 @@ import { loadCatalog } from './catalog.js'
 import { c, logo } from './color.js'
 import { createProject } from './create.js'
 import { diffStarter } from './diff.js'
-import { promptForStarter } from './prompt.js'
+import { promptConfirm, promptForStarter } from './prompt.js'
 import type { CreateOptions, DiffOptions } from './types.js'
 
 type CliDeps = {
@@ -11,6 +11,7 @@ type CliDeps = {
   createProject: typeof createProject
   diffStarter: typeof diffStarter
   promptForStarter: typeof promptForStarter
+  promptConfirm: typeof promptConfirm
   stdout: Pick<typeof console, 'log'>
 }
 
@@ -19,6 +20,7 @@ const defaultDeps: CliDeps = {
   createProject,
   diffStarter,
   promptForStarter,
+  promptConfirm,
   stdout: console,
 }
 
@@ -59,6 +61,14 @@ export async function runCli(
 
     if (!starter) {
       throw new UsageError(`Unknown starter: ${starterName}`, 'create')
+    }
+
+    if (options.git === undefined) {
+      options.git = await deps.promptConfirm('Initialize git? (Y/n) ')
+    }
+
+    if (options.install === undefined) {
+      options.install = await deps.promptConfirm('Install dependencies? (Y/n) ')
     }
 
     let root = await deps.createProject(starter, options)
@@ -112,10 +122,7 @@ export async function main() {
 }
 
 export function parseCreateArgs(argv: string[]): CreateOptions {
-  let options: CreateOptions = {
-    install: true,
-    git: true,
-  }
+  let options: CreateOptions = {}
 
   for (let index = 0; index < argv.length; index += 1) {
     let arg = argv[index]
