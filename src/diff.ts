@@ -1,8 +1,7 @@
-import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { run } from './subprocess.js'
+import { run, runOutput } from './subprocess.js'
 import type { DiffOptions, StarterSpec } from './types.js'
 
 type DiffDeps = {
@@ -103,38 +102,4 @@ async function gitOutput(
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
-}
-
-export async function runOutput(command: string, args: string[], cwd: string) {
-  return await new Promise<string>((resolve, reject) => {
-    let stdout = ''
-    let stderr = ''
-    let child = spawn(command, args, {
-      cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk)
-    })
-
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk)
-    })
-
-    child.once('error', reject)
-    child.once('exit', (code) => {
-      if (code === 0) {
-        resolve(stdout)
-        return
-      }
-
-      let detail = stderr.trim()
-      reject(
-        new Error(
-          detail || `${command} ${args.join(' ')} exited with code ${code}`,
-        ),
-      )
-    })
-  })
 }

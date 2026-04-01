@@ -164,8 +164,12 @@ async function installDependencies(root: string, runCommand: typeof run) {
   }
 }
 
+function getErrorCode(error: unknown) {
+  return (error as NodeJS.ErrnoException | undefined)?.code
+}
+
 function isCommandNotFound(error: unknown) {
-  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+  return getErrorCode(error) === 'ENOENT'
 }
 
 async function copyProject(source: string, destination: string) {
@@ -184,7 +188,7 @@ async function copyProject(source: string, destination: string) {
 }
 
 function shouldFallbackToCopy(error: unknown) {
-  let code = (error as NodeJS.ErrnoException | undefined)?.code
+  let code = getErrorCode(error)
   return code === 'EXDEV' || code === 'EPERM' || code === 'ENOTEMPTY'
 }
 
@@ -206,7 +210,7 @@ async function assertEmptyTarget(root: string) {
     await stat(root)
     throw new Error(`Target path already exists: ${root}`)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    if (getErrorCode(error) !== 'ENOENT') throw error
   }
 }
 
