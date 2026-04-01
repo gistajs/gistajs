@@ -39,12 +39,11 @@ export async function diffStarter(
     await fetchTag(root, fromTag, repoUrl, deps)
     await fetchTag(root, toTag, repoUrl, deps)
 
-    return await gitOutput(
-      root,
-      ['diff', '--stat', `refs/tags/${fromTag}`, `refs/tags/${toTag}`],
-      repoUrl,
-      deps,
-    )
+    let diffArgs = ['diff']
+    if (options.stat) diffArgs.push('--stat')
+    diffArgs.push(`refs/tags/${fromTag}`, `refs/tags/${toTag}`)
+
+    return await gitOutput(root, diffArgs, repoUrl, deps)
   } finally {
     await deps.rm(root, { recursive: true, force: true })
   }

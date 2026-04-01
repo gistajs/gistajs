@@ -75,6 +75,17 @@ describe('parseDiffArgs', () => {
     )
   })
 
+  it('parses --stat flag', () => {
+    expect(
+      parseDiffArgs(['auth', '2026-03-28-001', '2026-03-29-001', '--stat']),
+    ).toEqual({
+      starter: 'auth',
+      fromReleaseKey: '2026-03-28-001',
+      toReleaseKey: '2026-03-29-001',
+      stat: true,
+    })
+  })
+
   it('rejects missing catalog url values', () => {
     expect(() => parseDiffArgs(['auth', 'a', 'b', '--catalog-url'])).toThrow(
       '--catalog-url requires a value',
@@ -314,7 +325,6 @@ describe('diffStarter', () => {
       'git',
       [
         'diff',
-        '--stat',
         'refs/tags/auth/2026-03-28-001',
         'refs/tags/auth/2026-03-29-001',
       ],
@@ -324,6 +334,39 @@ describe('diffStarter', () => {
       recursive: true,
       force: true,
     })
+  })
+
+  it('passes --stat to git when stat option is set', async () => {
+    let run = vi.fn().mockResolvedValue(undefined)
+    let runOutput = vi.fn().mockResolvedValue(' package.json | 2 +-')
+    let rm = vi.fn().mockResolvedValue(undefined)
+
+    await diffStarter(
+      sampleCatalog[2]!,
+      {
+        starter: 'auth',
+        fromReleaseKey: '2026-03-28-001',
+        toReleaseKey: '2026-03-29-001',
+        stat: true,
+      },
+      {
+        mkdtemp: vi.fn().mockResolvedValue('/tmp/gistajs-diff-test'),
+        rm,
+        run,
+        runOutput,
+      },
+    )
+
+    expect(runOutput).toHaveBeenCalledWith(
+      'git',
+      [
+        'diff',
+        '--stat',
+        'refs/tags/auth/2026-03-28-001',
+        'refs/tags/auth/2026-03-29-001',
+      ],
+      '/tmp/gistajs-diff-test',
+    )
   })
 })
 

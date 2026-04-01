@@ -23,9 +23,11 @@ const defaultDeps: CliDeps = {
 }
 
 class UsageError extends Error {
-  constructor(message: string) {
+  command?: string
+  constructor(message: string, command?: string) {
     super(message)
     this.name = 'UsageError'
+    this.command = command
   }
 }
 
@@ -48,7 +50,7 @@ export async function runCli(
   if (command === 'create') {
     let options = parseCreateArgs(rest)
     if (!options.projectName) {
-      throw new UsageError('Project name is required')
+      throw new UsageError('Project name is required', 'create')
     }
 
     let catalog = await deps.loadCatalog(options.catalogUrl)
@@ -56,7 +58,7 @@ export async function runCli(
     let starter = catalog.find((entry) => entry.slug === starterName)
 
     if (!starter) {
-      throw new UsageError(`Unknown starter: ${starterName}`)
+      throw new UsageError(`Unknown starter: ${starterName}`, 'create')
     }
 
     let root = await deps.createProject(starter, options)
@@ -70,22 +72,22 @@ export async function runCli(
     let options = parseDiffArgs(rest)
 
     if (!options.starter) {
-      throw new UsageError('Starter is required')
+      throw new UsageError('Starter is required', 'diff')
     }
 
     if (!options.fromReleaseKey) {
-      throw new UsageError('From release key is required')
+      throw new UsageError('From release key is required', 'diff')
     }
 
     if (!options.toReleaseKey) {
-      throw new UsageError('To release key is required')
+      throw new UsageError('To release key is required', 'diff')
     }
 
     let catalog = await deps.loadCatalog(options.catalogUrl)
     let starter = catalog.find((entry) => entry.slug === options.starter)
 
     if (!starter) {
-      throw new UsageError(`Unknown starter: ${options.starter}`)
+      throw new UsageError(`Unknown starter: ${options.starter}`, 'diff')
     }
 
     let output = await deps.diffStarter(starter, options)
@@ -103,7 +105,7 @@ export async function main() {
     let message = error instanceof Error ? error.message : String(error)
     console.error(`${c.errorLabel('error:')} ${c.error(message)}`)
     if (error instanceof UsageError) {
-      console.error(getHelpText())
+      console.error(getHelpText(error.command))
     }
     process.exitCode = 1
   }
@@ -126,7 +128,8 @@ export function parseCreateArgs(argv: string[]): CreateOptions {
     }
 
     if (arg === '--starter') {
-      if (!argv[index + 1]) throw new UsageError('--starter requires a value')
+      if (!argv[index + 1])
+        throw new UsageError('--starter requires a value', 'create')
       options.starter = argv[index + 1]
       index += 1
       continue
@@ -144,14 +147,14 @@ export function parseCreateArgs(argv: string[]): CreateOptions {
 
     if (arg === '--catalog-url') {
       if (!argv[index + 1]) {
-        throw new UsageError('--catalog-url requires a value')
+        throw new UsageError('--catalog-url requires a value', 'create')
       }
       options.catalogUrl = argv[index + 1]
       index += 1
       continue
     }
 
-    throw new UsageError(`Unknown argument: ${arg}`)
+    throw new UsageError(`Unknown argument: ${arg}`, 'create')
   }
 
   return options
@@ -180,34 +183,72 @@ export function parseDiffArgs(argv: string[]): DiffOptions {
       continue
     }
 
+    if (arg === '--stat') {
+      options.stat = true
+      continue
+    }
+
     if (arg === '--catalog-url') {
       if (!argv[index + 1]) {
-        throw new UsageError('--catalog-url requires a value')
+        throw new UsageError('--catalog-url requires a value', 'diff')
       }
       options.catalogUrl = argv[index + 1]
       index += 1
       continue
     }
 
-    throw new UsageError(`Unknown argument: ${arg}`)
+    throw new UsageError(`Unknown argument: ${arg}`, 'diff')
   }
 
   return options
 }
 
-function getHelpText() {
+function getHelpText(command?: string) {
+  let header = `  ${c.brand('gistajs')} ${c.dim('— scaffold Gista.js starter projects')}`
+
+  if (command === 'create') {
+    return [
+      '',
+      header,
+      '',
+      `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs create')} <project-name> [--starter <slug>] [--no-install] [--no-git]`,
+      '',
+      `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs create my-app`,
+      `    ${c.dim('$')} gistajs create my-app --starter website`,
+      '',
+    ].join('\n')
+  }
+
+  if (command === 'diff') {
+    return [
+      '',
+      header,
+      '',
+      `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
+      '',
+      `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
+      `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001 --stat`,
+      '',
+    ].join('\n')
+  }
+
   return [
     '',
-    `  ${c.brand('gistajs')} ${c.dim('— scaffold Gista.js starter projects')}`,
+    header,
     '',
     `  ${c.bold('Usage:')}`,
     `    ${c.dim('$')} ${c.bold('gistajs create')} <project-name> [--starter <slug>] [--no-install] [--no-git]`,
-    `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key>`,
+    `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
     '',
     `  ${c.bold('Examples:')}`,
     `    ${c.dim('$')} gistajs create my-app`,
     `    ${c.dim('$')} gistajs create my-app --starter website`,
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
+    `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001 --stat`,
     '',
   ].join('\n')
 }

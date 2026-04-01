@@ -18,5 +18,6 @@ export type DiffOptions = {
   starter?: string
   fromReleaseKey?: string
   toReleaseKey?: string
+  stat?: boolean
   catalogUrl?: string
 }
