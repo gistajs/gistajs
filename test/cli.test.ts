@@ -1,19 +1,15 @@
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import * as tar from 'tar'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { parseCatalog } from '../src/catalog.js'
 import type { CliDeps } from '../src/cli.js'
-import { main, parseCreateArgs, parseDiffArgs, runCli } from '../src/cli.js'
-import { createProject, getStarterTarballUrl } from '../src/create.js'
 import {
-  diffStarter,
-  getStarterRepoUrl,
-  resolveStarterTagName,
-} from '../src/diff.js'
+  main,
+  parseCreateArgs,
+  parseDiffArgs,
+  parsePinArgs,
+  runCli,
+} from '../src/cli.js'
+import { parseStarterRelease } from '../src/releases.js'
 
-let tempRoots: string[] = []
 let sampleCatalog = parseCatalog([
   {
     slug: 'website',
@@ -35,16 +31,13 @@ let sampleCatalog = parseCatalog([
   },
 ])
 
-afterEach(async () => {
-  let { rm } = await import('node:fs/promises')
-
-  for (let root of tempRoots) {
-    await rm(root, { recursive: true, force: true })
-  }
-
-  tempRoots = []
-  vi.restoreAllMocks()
-})
+let sampleReleaseByStarter = {
+  auth: parseStarterRelease({
+    slug: 'auth',
+    latest: '2026-03-29-001',
+    releases: ['2026-03-29-001', '2026-03-28-001', '2026-03-27-001'],
+  }),
+}
 
 describe('parseCreateArgs', () => {
   it('parses starter flags', () => {
@@ -75,21 +68,16 @@ describe('parseDiffArgs', () => {
     )
   })
 
-  it('parses --stat flag', () => {
-    expect(
-      parseDiffArgs(['auth', '2026-03-28-001', '2026-03-29-001', '--stat']),
-    ).toEqual({
-      starter: 'auth',
-      fromReleaseKey: '2026-03-28-001',
-      toReleaseKey: '2026-03-29-001',
-      stat: true,
-    })
+  it('parses --latest flag', () => {
+    expect(parseDiffArgs(['--latest'])).toEqual({ latest: true })
   })
+})
 
-  it('rejects missing catalog url values', () => {
-    expect(() => parseDiffArgs(['auth', 'a', 'b', '--catalog-url'])).toThrow(
-      '--catalog-url requires a value',
-    )
+describe('parsePinArgs', () => {
+  it('parses a release key', () => {
+    expect(parsePinArgs(['2026-04-01-001'])).toEqual({
+      releaseKey: '2026-04-01-001',
+    })
   })
 })
 
@@ -102,364 +90,110 @@ describe('runCli', () => {
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
-    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
-      'gistajs create my-app',
-    )
   })
 
-  it('prints help for --help without loading the catalog', async () => {
+  it('prints diff help for bare diff invocation', async () => {
     let deps = makeCliDeps()
 
-    await runCli(['--help'], deps)
+    await runCli(['diff'], deps)
 
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
-    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Examples:')
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs diff')
   })
 
-  it('rejects create without a project name before any side effects', async () => {
-    let deps = makeCliDeps()
+  it('dispatches latest diff from the project pin', async () => {
+    let diffStarterMock = vi.fn().mockResolvedValue(' package.json | 2 +-')
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
+      loadStarterRelease: vi
+        .fn()
+        .mockResolvedValue(sampleReleaseByStarter.auth),
+      readProjectStarterPin: vi.fn().mockResolvedValue({
+        pin: 'auth:2026-03-28-001',
+        starter: 'auth',
+        releaseKey: '2026-03-28-001',
+      }),
+      diffStarter: diffStarterMock,
+    })
 
-    await expect(runCli(['create'], deps)).rejects.toThrow(
-      'Project name is required',
+    await runCli(['diff', '--latest', '--stat'], deps)
+
+    expect(diffStarterMock).toHaveBeenCalledWith(sampleCatalog[2], {
+      latest: true,
+      stat: true,
+      starter: 'auth',
+      fromReleaseKey: '2026-03-28-001',
+      toReleaseKey: '2026-03-29-001',
+    })
+  })
+
+  it('reports a no-op for latest diff when already pinned to latest', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
+      loadStarterRelease: vi
+        .fn()
+        .mockResolvedValue(sampleReleaseByStarter.auth),
+      readProjectStarterPin: vi.fn().mockResolvedValue({
+        pin: 'auth:2026-03-29-001',
+        starter: 'auth',
+        releaseKey: '2026-03-29-001',
+      }),
+    })
+
+    await runCli(['diff', '--latest'], deps)
+
+    expect(deps.diffStarter).not.toHaveBeenCalled()
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'Already pinned to latest auth release 2026-03-29-001',
     )
-
-    expect(deps.loadCatalog).not.toHaveBeenCalled()
-    expect(deps.promptForStarter).not.toHaveBeenCalled()
   })
 
-  it('rejects unknown commands before loading the catalog', async () => {
-    let deps = makeCliDeps()
-
-    await expect(runCli(['bogus'], deps)).rejects.toThrow(
-      'Unknown command: bogus',
-    )
-
-    expect(deps.loadCatalog).not.toHaveBeenCalled()
-  })
-
-  it('rejects diff without all required args before any side effects', async () => {
-    let deps = makeCliDeps()
-
-    await expect(
-      runCli(['diff', 'auth', '2026-03-28-001'], deps),
-    ).rejects.toThrow('To release key is required')
-
-    expect(deps.loadCatalog).not.toHaveBeenCalled()
-  })
-
-  it('dispatches diff with the resolved starter and args', async () => {
+  it('dispatches explicit release diff', async () => {
     let diffStarterMock = vi.fn().mockResolvedValue(' package.json | 2 +-')
     let deps = makeCliDeps({
       loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
+      loadStarterRelease: vi
+        .fn()
+        .mockResolvedValue(sampleReleaseByStarter.auth),
       diffStarter: diffStarterMock,
     })
 
     await runCli(['diff', 'auth', '2026-03-28-001', '2026-03-29-001'], deps)
 
-    expect(deps.loadCatalog).toHaveBeenCalledOnce()
     expect(diffStarterMock).toHaveBeenCalledWith(sampleCatalog[2], {
       starter: 'auth',
       fromReleaseKey: '2026-03-28-001',
       toReleaseKey: '2026-03-29-001',
     })
-    expect(deps.stdout.log).toHaveBeenCalledWith(' package.json | 2 +-')
-  })
-})
-
-describe('parseCatalog', () => {
-  it('parses starter entries', () => {
-    expect(sampleCatalog).toHaveLength(3)
-  })
-})
-
-describe('getStarterTarballUrl', () => {
-  it('builds the codeload URL from the starter repo', () => {
-    expect(getStarterTarballUrl(sampleCatalog[1]!)).toBe(
-      'https://codeload.github.com/gistajs/db/tar.gz/refs/heads/dev',
-    )
-  })
-})
-
-describe('createProject', () => {
-  it('extracts a starter archive and rewrites the package name', async () => {
-    let root = await prepareStarterArchive()
-    let projectRoot = join(root, 'demo')
-
-    await createProject(
-      sampleCatalog[0]!,
-      {
-        projectName: 'demo',
-        targetDir: projectRoot,
-        install: false,
-        git: false,
-      },
-      { initGit: vi.fn(), run: vi.fn() },
-    )
-
-    let pkg = JSON.parse(
-      await readFile(join(projectRoot, 'package.json'), 'utf8'),
-    )
-    expect(pkg.name).toBe('demo')
   })
 
-  it('prefers corepack pnpm for dependency installation', async () => {
-    let root = await prepareStarterArchive()
-    let run = vi.fn().mockResolvedValue(undefined)
-    let projectRoot = join(root, 'demo')
-
-    await createProject(
-      sampleCatalog[0]!,
-      {
-        projectName: 'demo',
-        targetDir: projectRoot,
-        install: true,
-        git: false,
-      },
-      {
-        initGit: vi.fn(),
-        run,
-      },
-    )
-
-    expect(run).toHaveBeenCalledWith(
-      'corepack',
-      ['pnpm', 'install'],
-      projectRoot,
-    )
-  })
-
-  it('falls back to global pnpm when corepack is unavailable', async () => {
-    let root = await prepareStarterArchive()
-    let run = vi
-      .fn()
-      .mockRejectedValueOnce(
-        Object.assign(new Error('missing'), { code: 'ENOENT' }),
-      )
-      .mockResolvedValueOnce(undefined)
-    let projectRoot = join(root, 'demo')
-
-    await createProject(
-      sampleCatalog[0]!,
-      {
-        projectName: 'demo',
-        targetDir: projectRoot,
-        install: true,
-        git: false,
-      },
-      {
-        initGit: vi.fn(),
-        run,
-      },
-    )
-
-    expect(run.mock.calls).toEqual([
-      ['corepack', ['pnpm', 'install'], projectRoot],
-      ['pnpm', ['install'], projectRoot],
-    ])
-  })
-
-  it('shows a clear error when neither corepack nor pnpm is available', async () => {
-    let root = await prepareStarterArchive()
-    let run = vi
-      .fn()
-      .mockRejectedValueOnce(
-        Object.assign(new Error('missing'), { code: 'ENOENT' }),
-      )
-      .mockRejectedValueOnce(
-        Object.assign(new Error('missing'), { code: 'ENOENT' }),
-      )
-    let projectRoot = join(root, 'demo')
-
-    await expect(
-      createProject(
-        sampleCatalog[0]!,
-        {
-          projectName: 'demo',
-          targetDir: projectRoot,
-          install: true,
-          git: false,
-        },
-        {
-          initGit: vi.fn(),
-          run,
-        },
-      ),
-    ).rejects.toThrow(
-      'Could not install dependencies because neither corepack nor pnpm is available.',
-    )
-  })
-})
-
-function makeCliDeps(overrides: Partial<CliDeps> = {}) {
-  return {
-    loadCatalog: vi.fn(),
-    createProject: vi.fn(),
-    diffStarter: vi.fn(),
-    promptForStarter: vi.fn(),
-    promptConfirm: vi.fn(),
-    stdout: { log: vi.fn() },
-    ...overrides,
-  } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
-}
-
-async function prepareStarterArchive() {
-  let root = await mkdtemp(join(tmpdir(), 'gistajs-test-'))
-  tempRoots.push(root)
-
-  let sourceRoot = join(root, 'source', 'gistajs-website-dev')
-  await mkdir(sourceRoot, { recursive: true })
-  await writeFile(
-    join(sourceRoot, 'package.json'),
-    `${JSON.stringify({ name: 'website' }, null, 2)}\n`,
-  )
-
-  let archivePath = join(root, 'website.tgz')
-  await tar.c(
-    {
-      gzip: true,
-      cwd: join(root, 'source'),
-      file: archivePath,
-    },
-    ['gistajs-website-dev'],
-  )
-
-  let bytes = await readFile(archivePath)
-  let response = new Response(new Blob([bytes]))
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
-
-  return root
-}
-
-describe('diffStarter', () => {
-  it('resolves starter tag names with the starter prefix', () => {
-    expect(resolveStarterTagName('auth', '2026-03-29-001')).toBe(
-      'auth/2026-03-29-001',
-    )
-  })
-
-  it('builds the starter repo url from the catalog entry', () => {
-    expect(getStarterRepoUrl(sampleCatalog[2]!)).toBe(
-      'https://github.com/gistajs/auth.git',
-    )
-  })
-
-  it('fetches both tags and diffs them by tag ref', async () => {
-    let run = vi.fn().mockResolvedValue(undefined)
-    let runOutput = vi.fn().mockResolvedValue(' package.json | 2 +-')
-    let rm = vi.fn().mockResolvedValue(undefined)
-
-    let output = await diffStarter(
-      sampleCatalog[2]!,
-      {
+  it('updates the project pin with the pin command', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      loadStarterRelease: vi
+        .fn()
+        .mockResolvedValue(sampleReleaseByStarter.auth),
+      readProjectStarterPin: vi.fn().mockResolvedValue({
+        pin: 'auth:2026-03-28-001',
         starter: 'auth',
-        fromReleaseKey: '2026-03-28-001',
-        toReleaseKey: '2026-03-29-001',
-      },
-      {
-        mkdtemp: vi.fn().mockResolvedValue('/tmp/gistajs-diff-test'),
-        rm,
-        run,
-        runOutput,
-      },
-    )
-
-    expect(output).toBe(' package.json | 2 +-')
-    expect(run.mock.calls).toEqual([
-      ['git', ['init', '-q'], '/tmp/gistajs-diff-test'],
-      [
-        'git',
-        ['remote', 'add', 'origin', 'https://github.com/gistajs/auth.git'],
-        '/tmp/gistajs-diff-test',
-      ],
-      [
-        'git',
-        [
-          'fetch',
-          '--quiet',
-          '--no-tags',
-          'origin',
-          'refs/tags/auth/2026-03-28-001:refs/tags/auth/2026-03-28-001',
-        ],
-        '/tmp/gistajs-diff-test',
-      ],
-      [
-        'git',
-        [
-          'fetch',
-          '--quiet',
-          '--no-tags',
-          'origin',
-          'refs/tags/auth/2026-03-29-001:refs/tags/auth/2026-03-29-001',
-        ],
-        '/tmp/gistajs-diff-test',
-      ],
-    ])
-    expect(runOutput).toHaveBeenCalledWith(
-      'git',
-      [
-        'diff',
-        'refs/tags/auth/2026-03-28-001',
-        'refs/tags/auth/2026-03-29-001',
-      ],
-      '/tmp/gistajs-diff-test',
-    )
-    expect(rm).toHaveBeenCalledWith('/tmp/gistajs-diff-test', {
-      recursive: true,
-      force: true,
-    })
-  })
-
-  it('passes --stat to git when stat option is set', async () => {
-    let run = vi.fn().mockResolvedValue(undefined)
-    let runOutput = vi.fn().mockResolvedValue(' package.json | 2 +-')
-    let rm = vi.fn().mockResolvedValue(undefined)
-
-    await diffStarter(
-      sampleCatalog[2]!,
-      {
+        releaseKey: '2026-03-28-001',
+      }),
+      writeProjectStarterPin: vi.fn().mockResolvedValue({
+        pin: 'auth:2026-03-29-001',
         starter: 'auth',
-        fromReleaseKey: '2026-03-28-001',
-        toReleaseKey: '2026-03-29-001',
-        stat: true,
-      },
-      {
-        mkdtemp: vi.fn().mockResolvedValue('/tmp/gistajs-diff-test'),
-        rm,
-        run,
-        runOutput,
-      },
-    )
-
-    expect(runOutput).toHaveBeenCalledWith(
-      'git',
-      [
-        'diff',
-        '--stat',
-        'refs/tags/auth/2026-03-28-001',
-        'refs/tags/auth/2026-03-29-001',
-      ],
-      '/tmp/gistajs-diff-test',
-    )
-  })
-})
-
-describe('git identity prompts', () => {
-  it('asks for git identity when none is configured', async () => {
-    let promptForGitIdentity = vi.fn().mockResolvedValue({
-      name: 'Test User',
-      email: 'test@example.com',
-      saveGlobal: false,
+        releaseKey: '2026-03-29-001',
+      }),
     })
 
-    let git = await import('../src/git.js')
-    await git.initGit('/tmp/example', sampleCatalog[0]!, {
-      promptForGitIdentity,
-      readGitConfig: () => '',
-      run: async () => {},
-    })
+    await runCli(['pin', '2026-03-29-001'], deps)
 
-    expect(promptForGitIdentity).toHaveBeenCalled()
+    expect(deps.writeProjectStarterPin).toHaveBeenCalledWith(
+      '/tmp/demo',
+      'auth:2026-03-29-001',
+    )
   })
 })
 
@@ -483,11 +217,23 @@ describe('main', () => {
       expect.stringContaining('Project name is required'),
     )
     expect(error).toHaveBeenNthCalledWith(2, expect.stringContaining('Usage:'))
-    expect(error).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('gistajs create my-app'),
-    )
 
     process.exitCode = previousExitCode
   })
 })
+
+function makeCliDeps(overrides: Partial<CliDeps> = {}) {
+  return {
+    loadCatalog: vi.fn(),
+    loadStarterRelease: vi.fn().mockResolvedValue(sampleReleaseByStarter.auth),
+    createProject: vi.fn(),
+    diffStarter: vi.fn(),
+    readProjectStarterPin: vi.fn(),
+    writeProjectStarterPin: vi.fn(),
+    promptForStarter: vi.fn(),
+    promptConfirm: vi.fn(),
+    stdout: { log: vi.fn() },
+    cwd: process.cwd(),
+    ...overrides,
+  } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
+}

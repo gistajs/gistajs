@@ -3,25 +3,35 @@ import { loadCatalog } from './catalog.js'
 import { c, logo } from './color.js'
 import { createProject } from './create.js'
 import { diffStarter } from './diff.js'
+import { readProjectStarterPin, writeProjectStarterPin } from './pin.js'
 import { promptConfirm, promptForStarter } from './prompt.js'
-import type { CreateOptions, DiffOptions } from './types.js'
+import { loadStarterRelease, validateStarterReleaseKey } from './releases.js'
+import type { CreateOptions, DiffOptions, PinOptions } from './types.js'
 
 export type CliDeps = {
   loadCatalog: typeof loadCatalog
+  loadStarterRelease: typeof loadStarterRelease
   createProject: typeof createProject
   diffStarter: typeof diffStarter
+  readProjectStarterPin: typeof readProjectStarterPin
+  writeProjectStarterPin: typeof writeProjectStarterPin
   promptForStarter: typeof promptForStarter
   promptConfirm: typeof promptConfirm
   stdout: Pick<typeof console, 'log'>
+  cwd: string
 }
 
 const defaultDeps: CliDeps = {
   loadCatalog,
+  loadStarterRelease,
   createProject,
   diffStarter,
+  readProjectStarterPin,
+  writeProjectStarterPin,
   promptForStarter,
   promptConfirm,
   stdout: console,
+  cwd: process.cwd(),
 }
 
 class UsageError extends Error {
@@ -79,7 +89,52 @@ export async function runCli(
   }
 
   if (command === 'diff') {
+    if (rest.length === 0) {
+      deps.stdout.log(getHelpText('diff'))
+      return
+    }
+
     let options = parseDiffArgs(rest)
+
+    if (options.latest) {
+      if (options.starter || options.fromReleaseKey || options.toReleaseKey) {
+        throw new UsageError(
+          '--latest does not take positional arguments',
+          'diff',
+        )
+      }
+
+      let projectPin = await deps.readProjectStarterPin(deps.cwd)
+      let catalog = await deps.loadCatalog(options.catalogUrl)
+      let starter = catalog.find((entry) => entry.slug === projectPin.starter)
+
+      if (!starter) {
+        throw new UsageError(`Unknown starter: ${projectPin.starter}`, 'diff')
+      }
+
+      let release = await deps.loadStarterRelease(starter.slug)
+      validateStarterReleaseKey(release, projectPin.releaseKey)
+
+      if (!release.latest) {
+        throw new Error(`Starter "${starter.slug}" has no published releases`)
+      }
+
+      if (projectPin.releaseKey === release.latest) {
+        deps.stdout.log(
+          `Already pinned to latest ${starter.slug} release ${release.latest}`,
+        )
+        return
+      }
+
+      let output = await deps.diffStarter(starter, {
+        ...options,
+        starter: starter.slug,
+        fromReleaseKey: projectPin.releaseKey,
+        toReleaseKey: release.latest,
+      })
+      deps.stdout.log(output.trimEnd())
+      return
+    }
 
     if (!options.starter) {
       throw new UsageError('Starter is required', 'diff')
@@ -100,8 +155,29 @@ export async function runCli(
       throw new UsageError(`Unknown starter: ${options.starter}`, 'diff')
     }
 
+    let release = await deps.loadStarterRelease(starter.slug)
+    validateStarterReleaseKey(release, options.fromReleaseKey)
+    validateStarterReleaseKey(release, options.toReleaseKey)
+
     let output = await deps.diffStarter(starter, options)
     deps.stdout.log(output.trimEnd())
+    return
+  }
+
+  if (command === 'pin') {
+    let options = parsePinArgs(rest)
+
+    if (!options.releaseKey) {
+      throw new UsageError('Release key is required', 'pin')
+    }
+
+    let projectPin = await deps.readProjectStarterPin(deps.cwd)
+    let release = await deps.loadStarterRelease(projectPin.starter)
+    validateStarterReleaseKey(release, options.releaseKey)
+
+    let nextPin = `${projectPin.starter}:${options.releaseKey}`
+    let written = await deps.writeProjectStarterPin(deps.cwd, nextPin)
+    deps.stdout.log(`Pinned ${written.starter} to ${written.releaseKey}`)
     return
   }
 
@@ -195,6 +271,11 @@ export function parseDiffArgs(argv: string[]): DiffOptions {
       continue
     }
 
+    if (arg === '--latest') {
+      options.latest = true
+      continue
+    }
+
     if (arg === '--catalog-url') {
       if (!argv[index + 1]) {
         throw new UsageError('--catalog-url requires a value', 'diff')
@@ -205,6 +286,25 @@ export function parseDiffArgs(argv: string[]): DiffOptions {
     }
 
     throw new UsageError(`Unknown argument: ${arg}`, 'diff')
+  }
+
+  return options
+}
+
+export function parsePinArgs(argv: string[]): PinOptions {
+  let options: PinOptions = {}
+
+  for (let index = 0; index < argv.length; index += 1) {
+    let arg = argv[index]
+
+    if (!arg) continue
+
+    if (!arg.startsWith('--') && !options.releaseKey) {
+      options.releaseKey = arg
+      continue
+    }
+
+    throw new UsageError(`Unknown argument: ${arg}`, 'pin')
   }
 
   return options
@@ -234,11 +334,28 @@ function getHelpText(command?: string) {
       header,
       '',
       `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs diff')} --latest [--stat]`,
       `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
       '',
       `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs diff --latest`,
+      `    ${c.dim('$')} gistajs diff --latest --stat`,
       `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
       `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001 --stat`,
+      '',
+    ].join('\n')
+  }
+
+  if (command === 'pin') {
+    return [
+      '',
+      header,
+      '',
+      `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs pin')} <release-key>`,
+      '',
+      `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs pin 2026-04-01-001`,
       '',
     ].join('\n')
   }
@@ -249,13 +366,18 @@ function getHelpText(command?: string) {
     '',
     `  ${c.bold('Usage:')}`,
     `    ${c.dim('$')} ${c.bold('gistajs create')} <project-name> [--starter <slug>] [--no-install] [--no-git]`,
+    `    ${c.dim('$')} ${c.bold('gistajs diff')} --latest [--stat]`,
     `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
+    `    ${c.dim('$')} ${c.bold('gistajs pin')} <release-key>`,
     '',
     `  ${c.bold('Examples:')}`,
     `    ${c.dim('$')} gistajs create my-app`,
     `    ${c.dim('$')} gistajs create my-app --starter website`,
+    `    ${c.dim('$')} gistajs diff --latest`,
+    `    ${c.dim('$')} gistajs diff --latest --stat`,
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001 --stat`,
+    `    ${c.dim('$')} gistajs pin 2026-04-01-001`,
     '',
   ].join('\n')
 }
