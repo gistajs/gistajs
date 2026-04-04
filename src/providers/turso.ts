@@ -3,14 +3,13 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { getEnvVar, setEnvVar } from '../utils/env.js'
 import { promptConfirm, promptText } from '../utils/prompt.js'
-import { run, runChecked, runOutput } from '../utils/subprocess.js'
+import { run, runOutput } from '../utils/subprocess.js'
 import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
 import { getSharedRegion } from './regions.js'
 
 type ProvisionDeps = {
   run: typeof run
-  runChecked: typeof runChecked
   runOutput: typeof runOutput
   promptConfirm: typeof promptConfirm
   promptText: typeof promptText
@@ -23,7 +22,6 @@ type ProvisionDeps = {
 
 const defaultDeps: ProvisionDeps = {
   run,
-  runChecked,
   runOutput,
   promptConfirm,
   promptText,
@@ -143,7 +141,7 @@ export async function provisionTurso(
     }
   }
 
-  await deps.runChecked('turso', ['db', 'create', name, '--group', group], cwd)
+  await deps.runOutput('turso', ['db', 'create', name, '--group', group], cwd)
 
   let url = (
     await deps.runOutput('turso', ['db', 'show', name, '--url'], cwd)

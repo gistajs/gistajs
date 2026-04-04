@@ -71,7 +71,21 @@ type ProjectPackage = Record<string, unknown> & {
 
 type ProvisionSummary = Record<ProvisionStatus, string[]>
 
-async function runProjectProvision(deps: CliDeps) {
+type ProjectProvisionDeps = Pick<
+  CliDeps,
+  | 'cwd'
+  | 'getCliVersion'
+  | 'getDefaultProvisionRegion'
+  | 'promptText'
+  | 'provisionTurso'
+  | 'provisionVercel'
+  | 'readFile'
+  | 'runProjectCommand'
+  | 'stdout'
+  | 'writeFile'
+>
+
+async function runProjectProvision(deps: ProjectProvisionDeps) {
   let pkg = await readProvisionPackage(deps)
   let providers = pkg.gistajs?.providers
 
@@ -100,15 +114,25 @@ async function runProjectProvision(deps: CliDeps) {
     skipped: [],
     pending: [],
   }
+  let shouldApplySchema = false
+  let appliedSchema = false
 
   for (let provider of providers) {
     if (provider === 'turso') {
       let result = await deps.provisionTurso(deps.cwd, region)
       summary[result.status].push(result.provider)
+      shouldApplySchema =
+        result.status === 'completed' || result.status === 'skipped'
       continue
     }
 
     if (provider === 'vercel') {
+      if (shouldApplySchema && !appliedSchema) {
+        await applyProductionSchema(deps)
+        summary.completed.push('atlas')
+        appliedSchema = true
+      }
+
       let result = await deps.provisionVercel(deps.cwd, region)
       summary[result.status].push(result.provider)
       continue
@@ -116,6 +140,11 @@ async function runProjectProvision(deps: CliDeps) {
 
     deps.stdout.log(`Skipping ${provider}. This provider is not supported yet.`)
     summary.pending.push(provider)
+  }
+
+  if (shouldApplySchema && !appliedSchema) {
+    await applyProductionSchema(deps)
+    summary.completed.push('atlas')
   }
 
   printSummary(summary, deps)
@@ -182,6 +211,20 @@ async function getPromptDefaultRegion(
   }
 
   return getDefaultSharedRegion()
+}
+
+async function applyProductionSchema(
+  deps: Pick<CliDeps, 'cwd' | 'runProjectCommand' | 'stdout'>,
+) {
+  try {
+    await deps.runProjectCommand(deps.cwd, 'atlas:prod')
+  } catch {
+    throw new Error(
+      'Could not apply production schema. Run `pnpm atlas:prod` manually.',
+    )
+  }
+
+  deps.stdout.log('Applied production schema.')
 }
 
 function printSummary(

@@ -357,7 +357,6 @@ describe('provisionVercel', () => {
 function makeDeps(overrides: Record<string, unknown> = {}) {
   return {
     run: vi.fn().mockResolvedValue(undefined),
-    runChecked: vi.fn().mockResolvedValue(''),
     runOutput: vi.fn().mockResolvedValue(''),
     promptConfirm: vi.fn().mockResolvedValue(true),
     promptText: vi.fn().mockResolvedValue(''),

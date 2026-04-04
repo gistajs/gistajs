@@ -11,6 +11,7 @@ import { provisionVercel } from '../providers/vercel.js'
 import { loadCatalog } from './catalog.js'
 import { promptConfirm, promptForStarter, promptText } from './prompt.js'
 import { loadStarterRelease } from './releases.js'
+import { run } from './subprocess.js'
 
 declare const __GISTAJS_VERSION__: string
 
@@ -39,6 +40,7 @@ export type CliDeps = {
   cwd: string
   getCliVersion: () => Promise<string>
   getDefaultProvisionRegion: () => Promise<string | null>
+  runProjectCommand: (cwd: string, script: string) => Promise<void>
 }
 
 async function readCliVersion() {
@@ -47,6 +49,10 @@ async function readCliVersion() {
   }
 
   return __GISTAJS_VERSION__
+}
+
+async function runProjectCommand(cwd: string, script: string) {
+  await run('pnpm', [script], cwd)
 }
 
 async function readDefaultProvisionRegion() {
@@ -89,4 +95,5 @@ export const defaultDeps: CliDeps = {
   cwd: process.cwd(),
   getCliVersion: readCliVersion,
   getDefaultProvisionRegion: readDefaultProvisionRegion,
+  runProjectCommand,
 }

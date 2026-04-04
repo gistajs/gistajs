@@ -176,6 +176,7 @@ describe('runCli', () => {
   })
 
   it('dispatches project-aware provision from package metadata', async () => {
+    let steps: string[] = []
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
       readFile: vi
@@ -187,13 +188,24 @@ describe('runCli', () => {
       getDefaultProvisionRegion: vi
         .fn()
         .mockResolvedValue('aws-ap-northeast-1'),
-      provisionTurso: vi.fn().mockResolvedValue({
-        provider: 'turso',
-        status: 'completed',
+      provisionTurso: vi.fn().mockImplementation(async () => {
+        steps.push('turso')
+
+        return {
+          provider: 'turso',
+          status: 'completed',
+        }
       }),
-      provisionVercel: vi.fn().mockResolvedValue({
-        provider: 'vercel',
-        status: 'completed',
+      runProjectCommand: vi.fn().mockImplementation(async () => {
+        steps.push('atlas:prod')
+      }),
+      provisionVercel: vi.fn().mockImplementation(async () => {
+        steps.push('vercel')
+
+        return {
+          provider: 'vercel',
+          status: 'completed',
+        }
       }),
     })
 
@@ -204,13 +216,83 @@ describe('runCli', () => {
       label: 'Tokyo',
       vercel: 'hnd1',
     })
+    expect(deps.runProjectCommand).toHaveBeenCalledWith(
+      '/tmp/demo',
+      'atlas:prod',
+    )
     expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
       id: 'aws-ap-northeast-1',
       label: 'Tokyo',
       vercel: 'hnd1',
     })
+    expect(steps).toEqual(['turso', 'atlas:prod', 'vercel'])
+    expect(deps.stdout.log).toHaveBeenCalledWith('Applied production schema.')
     expect(deps.stdout.log).toHaveBeenCalledWith('Provision summary')
-    expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso, vercel')
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'completed: turso, atlas, vercel',
+    )
+  })
+
+  it('runs atlas after a skipped Turso step and before Vercel', async () => {
+    let steps: string[] = []
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          makeProjectPackage({ providers: ['turso', 'vercel'] }),
+        ),
+      promptText: vi.fn().mockResolvedValue(''),
+      provisionTurso: vi.fn().mockImplementation(async () => {
+        steps.push('turso')
+
+        return {
+          provider: 'turso',
+          status: 'skipped',
+        }
+      }),
+      runProjectCommand: vi.fn().mockImplementation(async () => {
+        steps.push('atlas:prod')
+      }),
+      provisionVercel: vi.fn().mockImplementation(async () => {
+        steps.push('vercel')
+
+        return {
+          provider: 'vercel',
+          status: 'completed',
+        }
+      }),
+    })
+
+    await runCli(['provision'], deps)
+
+    expect(steps).toEqual(['turso', 'atlas:prod', 'vercel'])
+    expect(deps.stdout.log).toHaveBeenCalledWith('completed: atlas, vercel')
+    expect(deps.stdout.log).toHaveBeenCalledWith('skipped: turso')
+  })
+
+  it('stops before Vercel when atlas:prod fails', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          makeProjectPackage({ providers: ['turso', 'vercel'] }),
+        ),
+      promptText: vi.fn().mockResolvedValue(''),
+      provisionTurso: vi.fn().mockResolvedValue({
+        provider: 'turso',
+        status: 'completed',
+      }),
+      runProjectCommand: vi.fn().mockRejectedValue(new Error('boom')),
+      provisionVercel: vi.fn(),
+    })
+
+    await expect(runCli(['provision'], deps)).rejects.toThrow(
+      'Could not apply production schema. Run `pnpm atlas:prod` manually.',
+    )
+
+    expect(deps.provisionVercel).not.toHaveBeenCalled()
   })
 
   it('rejects unknown provision providers', async () => {
@@ -391,6 +473,7 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     cwd: process.cwd(),
     getCliVersion: vi.fn().mockResolvedValue('0.1.3'),
     getDefaultProvisionRegion: vi.fn().mockResolvedValue(null),
+    runProjectCommand: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
 }
