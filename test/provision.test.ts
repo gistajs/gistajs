@@ -16,7 +16,10 @@ describe('provisionTurso', () => {
       promptConfirm: vi.fn().mockResolvedValue(false),
     })
 
-    await provisionTurso('/tmp/demo', deps)
+    await expect(provisionTurso('/tmp/demo', deps)).resolves.toEqual({
+      provider: 'turso',
+      status: 'skipped',
+    })
 
     expect(deps.run).not.toHaveBeenCalled()
     expect(deps.writeFile).not.toHaveBeenCalled()
@@ -46,6 +49,42 @@ describe('provisionTurso', () => {
     await expect(provisionTurso('/tmp/demo', deps)).rejects.toThrow(
       'Could not read any Turso groups',
     )
+  })
+
+  it('returns a completed result after writing credentials', async () => {
+    let deps = makeDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'org list') {
+          return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
+        }
+
+        if (args.join(' ') === 'db list') {
+          return 'NAME GROUP LOCATIONS\n'
+        }
+
+        if (args.join(' ') === 'group list') {
+          return 'NAME LOCATION\ndefault tokyo\n'
+        }
+
+        if (args.join(' ') === 'db show demo --url') {
+          return 'libsql://demo.turso.io'
+        }
+
+        if (args.join(' ') === 'db tokens create demo') {
+          return 'secret-token'
+        }
+
+        return ''
+      }),
+      promptText: vi.fn().mockResolvedValue('demo'),
+    })
+
+    await expect(provisionTurso('/tmp/demo', deps)).resolves.toEqual({
+      provider: 'turso',
+      status: 'completed',
+    })
+
+    expect(deps.writeFile).toHaveBeenCalledOnce()
   })
 })
 

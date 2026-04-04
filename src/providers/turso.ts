@@ -3,6 +3,7 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { promptConfirm, promptText } from '../utils/prompt.js'
 import { run, runOutput } from '../utils/subprocess.js'
+import type { ProvisionResult } from '../utils/types.js'
 
 type ProvisionDeps = {
   run: typeof run
@@ -31,7 +32,7 @@ const defaultDeps: ProvisionDeps = {
 export async function provisionTurso(
   cwd: string,
   deps: ProvisionDeps = defaultDeps,
-) {
+): Promise<ProvisionResult> {
   if (!deps.isTTY) {
     throw new Error(
       '`gistajs provision turso` requires an interactive terminal',
@@ -61,7 +62,10 @@ export async function provisionTurso(
 
     if (!overwrite) {
       deps.stdout.log('Cancelled. Existing database credentials were kept.')
-      return
+      return {
+        provider: 'turso',
+        status: 'skipped',
+      }
     }
   }
 
@@ -151,6 +155,11 @@ export async function provisionTurso(
   await deps.writeFile(envPath, file, 'utf8')
 
   deps.stdout.log('Saved Turso credentials to .env')
+
+  return {
+    provider: 'turso',
+    status: 'completed',
+  }
 }
 
 async function ensureEnvFile(

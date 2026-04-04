@@ -52,7 +52,16 @@ After you accept an upgrade, advance the pin explicitly with `gistajs pin <relea
 
 ### Provision
 
-Provision a Turso database for the current project and write `DB_URL` plus `DB_AUTH_TOKEN` into `.env`:
+Provision the current project from its `package.json` metadata:
+
+```bash
+npx gistajs provision
+```
+
+For starters that declare Turso, this provisions a database and writes `DB_URL` plus `DB_AUTH_TOKEN` into `.env`.
+The command checks the project's declared `gistajs` dependency first and fails clearly if the installed CLI is too old.
+
+You can still run a provider directly when debugging:
 
 ```bash
 npx gistajs provision turso

@@ -13,4 +13,6 @@ export type {
   DiffOptions,
   PinOptions,
   ProvisionOptions,
+  ProvisionResult,
+  ProvisionStatus,
 } from './utils/types.js'

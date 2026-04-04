@@ -35,6 +35,13 @@ export type PinOptions = {
 
 export type ProvisionProvider = 'turso' | 'vercel'
 
+export type ProvisionStatus = 'completed' | 'skipped' | 'pending'
+
 export type ProvisionOptions = {
   provider?: ProvisionProvider | string
+}
+
+export type ProvisionResult = {
+  provider: ProvisionProvider | string
+  status: ProvisionStatus
 }

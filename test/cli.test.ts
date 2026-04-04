@@ -80,6 +80,10 @@ describe('parsePinArgs', () => {
 })
 
 describe('parseProvisionArgs', () => {
+  it('allows project-aware provision with no provider', () => {
+    expect(parseProvisionArgs([])).toEqual({})
+  })
+
   it('parses a provider', () => {
     expect(parseProvisionArgs(['turso'])).toEqual({
       provider: 'turso',
@@ -106,15 +110,6 @@ describe('runCli', () => {
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs diff')
-  })
-
-  it('prints provision help for bare provision invocation', async () => {
-    let deps = makeCliDeps()
-
-    await runCli(['provision'], deps)
-
-    expect(deps.stdout.log).toHaveBeenCalledOnce()
-    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs provision')
   })
 
   it('dispatches latest diff from the project pin', async () => {
@@ -214,7 +209,10 @@ describe('runCli', () => {
   it('dispatches Turso provisioning from the current directory', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
-      provisionTurso: vi.fn().mockResolvedValue(undefined),
+      provisionTurso: vi.fn().mockResolvedValue({
+        provider: 'turso',
+        status: 'completed',
+      }),
     })
 
     await runCli(['provision', 'turso'], deps)
@@ -222,11 +220,110 @@ describe('runCli', () => {
     expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo')
   })
 
+  it('dispatches project-aware provision from package metadata', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          gistajs: {
+            pin: 'form:2026-04-01-001',
+            providers: ['turso'],
+          },
+          devDependencies: {
+            gistajs: '^0.1.3',
+          },
+        }),
+      ),
+      provisionTurso: vi.fn().mockResolvedValue({
+        provider: 'turso',
+        status: 'completed',
+      }),
+    })
+
+    await runCli(['provision'], deps)
+
+    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo')
+    expect(deps.stdout.log).toHaveBeenCalledWith('Provision summary')
+    expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso')
+  })
+
   it('rejects unknown provision providers', async () => {
     let deps = makeCliDeps()
 
     await expect(runCli(['provision', 'fly'], deps)).rejects.toThrow(
       'Unknown provider: fly',
+    )
+  })
+
+  it('fails loudly when the installed cli version is too old for the project', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      getCliVersion: vi.fn().mockResolvedValue('0.1.2'),
+      readFile: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          gistajs: {
+            pin: 'form:2026-04-01-001',
+            providers: ['turso'],
+          },
+          devDependencies: {
+            gistajs: '^0.1.3',
+          },
+        }),
+      ),
+    })
+
+    await expect(runCli(['provision'], deps)).rejects.toThrow(
+      'Run `pnpm up gistajs`.',
+    )
+  })
+
+  it('reports pending providers declared by the starter', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          gistajs: {
+            pin: 'form:2026-04-01-001',
+            providers: ['vercel'],
+          },
+          devDependencies: {
+            gistajs: '^0.1.3',
+          },
+        }),
+      ),
+    })
+
+    await runCli(['provision'], deps)
+
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'Skipping vercel. `gistajs provision vercel` is not implemented yet.',
+    )
+    expect(deps.stdout.log).toHaveBeenCalledWith('pending: vercel')
+  })
+
+  it('fails clearly when package.json is missing', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('missing'), { code: 'ENOENT' }),
+        ),
+    })
+
+    await expect(runCli(['provision'], deps)).rejects.toThrow(
+      'No package.json found. Run this from a Gista.js project directory.',
+    )
+  })
+
+  it('fails clearly when package.json is invalid json', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi.fn().mockResolvedValue('{'),
+    })
+
+    await expect(runCli(['provision'], deps)).rejects.toThrow(
+      'Could not parse package.json in the current directory.',
     )
   })
 })
@@ -267,8 +364,10 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     provisionTurso: vi.fn(),
     promptForStarter: vi.fn(),
     promptConfirm: vi.fn(),
+    readFile: vi.fn(),
     stdout: { log: vi.fn() },
     cwd: process.cwd(),
+    getCliVersion: vi.fn().mockResolvedValue('0.1.3'),
     ...overrides,
   } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
 }
