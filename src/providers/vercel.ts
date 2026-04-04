@@ -44,7 +44,7 @@ export async function provisionVercel(
 
   if (!deps.existsSync(join(cwd, '.vercel', 'project.json'))) {
     deps.stdout.log('Linking this directory to a Vercel project...')
-    await deps.run('vercel', ['link'], cwd)
+    await deps.run('vercel', ['link', '--yes'], cwd)
   }
 
   let envPath = join(cwd, '.env')

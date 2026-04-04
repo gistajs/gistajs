@@ -304,7 +304,11 @@ describe('provisionVercel', () => {
 
     await provisionVercel('/tmp/demo', oregon, deps)
 
-    expect(deps.run).toHaveBeenCalledWith('vercel', ['link'], '/tmp/demo')
+    expect(deps.run).toHaveBeenCalledWith(
+      'vercel',
+      ['link', '--yes'],
+      '/tmp/demo',
+    )
   })
 
   it('checks Vercel auth with a quiet whoami probe', async () => {
