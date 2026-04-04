@@ -67,7 +67,7 @@ npx gistajs provision turso
 npx gistajs provision vercel
 ```
 
-The command is interactive. It asks for a shared region first, defaults new projects to Oregon, reuses the saved region on later runs, creates a Turso group in that region when needed, links Vercel when needed, and asks before overwriting existing database credentials in `.env`.
+The command is interactive. It asks for a shared region first, defaults new projects to Turso's nearest region when available, falls back to Oregon otherwise, reuses the saved `gistajs.region` on later runs, creates a Turso group in that region when needed, links Vercel when needed, and asks before overwriting existing database credentials in `.env`.
 
 ## Development
 
