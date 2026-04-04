@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository contains `gistajs`, a small TypeScript CLI for scaffolding Gista.js starter projects.
+This repository contains `gistajs`, a small TypeScript CLI for scaffolding and managing Gista.js starter projects.
 
 The CLI entrypoint is `src/bin.ts`, which calls `main()` from `src/cli.ts`. The package also exposes a small programmatic API through `src/index.ts`.
 
@@ -23,7 +23,7 @@ The CLI entrypoint is `src/bin.ts`, which calls `main()` from `src/cli.ts`. The 
 - `src/prompt.ts`: interactive readline prompts
 - `src/index.ts`: public library exports
 - `src/bin.ts`: executable entrypoint
-- `test/cli.test.ts`: CLI and scaffold behavior tests
+- `test/*.test.ts`: CLI, scaffold, and provisioning behavior tests
 
 ## Common commands
 
@@ -43,6 +43,7 @@ pnpm test -- --run
 
 - Add or update `vitest` coverage for behavior changes, especially in `test/cli.test.ts`.
 - For CLI changes, test both valid and invalid invocation paths.
+- For provisioning changes, cover provider preflight failures and config-write safeguards.
 - Mock catalog loading, prompts, and subprocess-style side effects when validating control flow.
 
 ## Build notes
@@ -56,6 +57,7 @@ pnpm test -- --run
 - Scaffolding currently relies on network fetches for the starter catalog and starter tarballs.
 - `createProject` runs `pnpm install` unless disabled.
 - `initGit` may prompt for git identity if none is configured.
+- Provisioning flows should wrap external CLIs without assuming stable human-formatted output when machine-readable output is available.
 - Avoid overwriting unrelated local changes in the worktree.
 
 ## Final response note

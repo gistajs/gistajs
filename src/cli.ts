@@ -311,7 +311,7 @@ export function parsePinArgs(argv: string[]): PinOptions {
 }
 
 function getHelpText(command?: string) {
-  let header = `  ${c.brand('gistajs')} ${c.dim('— scaffold Gista.js starter projects')}`
+  let header = `  ${c.brand('gistajs')} ${c.dim('— scaffold and manage Gista.js starter projects')}`
 
   if (command === 'create') {
     return [
