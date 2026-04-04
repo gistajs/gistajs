@@ -269,26 +269,19 @@ describe('provisionVercel', () => {
     expect(deps.runInput.mock.calls).toEqual([
       [
         'vercel',
-        [
-          'env',
-          'update',
-          'COOKIE_SECRET',
-          'production',
-          '--yes',
-          '--sensitive',
-        ],
+        ['env', 'update', 'COOKIE_SECRET', 'production', '--yes'],
         '/tmp/demo',
         'secret\n',
       ],
       [
         'vercel',
-        ['env', 'add', 'DB_URL', 'production', '--force', '--sensitive'],
+        ['env', 'add', 'DB_URL', 'production', '--force'],
         '/tmp/demo',
         'libsql://demo\n',
       ],
       [
         'vercel',
-        ['env', 'add', 'DB_AUTH_TOKEN', 'production', '--force', '--sensitive'],
+        ['env', 'add', 'DB_AUTH_TOKEN', 'production', '--force'],
         '/tmp/demo',
         'token\n',
       ],

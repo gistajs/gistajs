@@ -65,8 +65,8 @@ export async function provisionVercel(
 
   for (let [key, value] of values) {
     let args = existing.includes(key)
-      ? ['env', 'update', key, 'production', '--yes', '--sensitive']
-      : ['env', 'add', key, 'production', '--force', '--sensitive']
+      ? ['env', 'update', key, 'production', '--yes']
+      : ['env', 'add', key, 'production', '--force']
 
     await deps.runInput('vercel', args, cwd, `${value}\n`)
   }
