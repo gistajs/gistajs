@@ -156,11 +156,19 @@ async function readGitRemotes(
       .map((line) => line.trim())
       .filter(Boolean)
   } catch (error) {
+    let message = error instanceof Error ? error.message : String(error)
+    let normalized = message.toLowerCase()
     let code = (error as NodeJS.ErrnoException).code
 
-    if (code === 'ENOENT') return []
+    if (
+      code === 'ENOENT' ||
+      normalized.includes('not a git repository') ||
+      normalized.includes('no such file or directory')
+    ) {
+      return []
+    }
 
-    return []
+    throw error
   }
 }
 
@@ -171,11 +179,8 @@ function canSkipGitConnect(message: string) {
     normalized.includes('already connected') ||
     normalized.includes('connected git repository') ||
     normalized.includes('no git remote') ||
-    normalized.includes('no remote') ||
-    normalized.includes('not ready') ||
-    normalized.includes('not found') ||
-    normalized.includes('permission') ||
-    normalized.includes('access') ||
-    normalized.includes('push')
+    normalized.includes('no remotes') ||
+    normalized.includes('push first') ||
+    normalized.includes('repository has not been pushed')
   )
 }
