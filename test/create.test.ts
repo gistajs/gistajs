@@ -56,7 +56,9 @@ describe('createProject', () => {
       },
       {
         initGit: vi.fn(),
+        promptConfirm: vi.fn(),
         run: vi.fn(),
+        stdout: { log: vi.fn() },
       },
     )
 
@@ -82,7 +84,9 @@ describe('createProject', () => {
       },
       {
         initGit: vi.fn(),
+        promptConfirm: vi.fn().mockResolvedValue(false),
         run,
+        stdout: { log: vi.fn() },
       },
     )
 
@@ -113,7 +117,9 @@ describe('createProject', () => {
       },
       {
         initGit: vi.fn(),
+        promptConfirm: vi.fn().mockResolvedValue(false),
         run,
+        stdout: { log: vi.fn() },
       },
     )
 
@@ -146,16 +152,220 @@ describe('createProject', () => {
         },
         {
           initGit: vi.fn(),
+          promptConfirm: vi.fn(),
           run,
+          stdout: { log: vi.fn() },
         },
       ),
     ).rejects.toThrow(
-      'Could not install dependencies because neither corepack nor pnpm is available.',
+      'Could not run pnpm install because neither corepack nor pnpm is available.',
+    )
+  })
+
+  it('prompts to run prep after install when the starter defines it', async () => {
+    let root = await prepareStarterArchive({
+      scripts: {
+        prep: 'node scripts/prep.js',
+      },
+    })
+    let run = vi.fn().mockResolvedValue(undefined)
+    let promptConfirm = vi.fn().mockResolvedValue(true)
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        promptConfirm,
+        run,
+        stdout: { log: vi.fn() },
+      },
+    )
+
+    expect(promptConfirm).toHaveBeenCalledWith('Run project setup now? (Y/n) ')
+    expect(run.mock.calls).toEqual([
+      ['corepack', ['pnpm', 'install'], projectRoot],
+      ['corepack', ['pnpm', 'prep'], projectRoot],
+    ])
+  })
+
+  it('skips prep when the prompt is declined', async () => {
+    let root = await prepareStarterArchive({
+      scripts: {
+        prep: 'node scripts/prep.js',
+      },
+    })
+    let run = vi.fn().mockResolvedValue(undefined)
+    let promptConfirm = vi.fn().mockResolvedValue(false)
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        promptConfirm,
+        run,
+        stdout: { log: vi.fn() },
+      },
+    )
+
+    expect(promptConfirm).toHaveBeenCalledOnce()
+    expect(run.mock.calls).toEqual([
+      ['corepack', ['pnpm', 'install'], projectRoot],
+    ])
+  })
+
+  it('does not prompt for prep when the starter does not define it', async () => {
+    let root = await prepareStarterArchive()
+    let run = vi.fn().mockResolvedValue(undefined)
+    let promptConfirm = vi.fn()
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        promptConfirm,
+        run,
+        stdout: { log: vi.fn() },
+      },
+    )
+
+    expect(promptConfirm).not.toHaveBeenCalled()
+    expect(run.mock.calls).toEqual([
+      ['corepack', ['pnpm', 'install'], projectRoot],
+    ])
+  })
+
+  it('does not prompt for prep when install is skipped', async () => {
+    let root = await prepareStarterArchive({
+      scripts: {
+        prep: 'node scripts/prep.js',
+      },
+    })
+    let promptConfirm = vi.fn()
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: false,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        promptConfirm,
+        run: vi.fn(),
+        stdout: { log: vi.fn() },
+      },
+    )
+
+    expect(promptConfirm).not.toHaveBeenCalled()
+  })
+
+  it('falls back to global pnpm for prep when corepack is unavailable', async () => {
+    let root = await prepareStarterArchive({
+      scripts: {
+        prep: 'node scripts/prep.js',
+      },
+    })
+    let run = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(
+        Object.assign(new Error('missing'), { code: 'ENOENT' }),
+      )
+      .mockResolvedValueOnce(undefined)
+    let projectRoot = join(root, 'demo')
+
+    await createProject(
+      sampleCatalog[0]!,
+      {
+        projectName: 'demo',
+        targetDir: projectRoot,
+        install: true,
+        git: false,
+      },
+      {
+        initGit: vi.fn(),
+        promptConfirm: vi.fn().mockResolvedValue(true),
+        run,
+        stdout: { log: vi.fn() },
+      },
+    )
+
+    expect(run.mock.calls).toEqual([
+      ['corepack', ['pnpm', 'install'], projectRoot],
+      ['corepack', ['pnpm', 'prep'], projectRoot],
+      ['pnpm', ['prep'], projectRoot],
+    ])
+  })
+
+  it('warns and continues when prep fails', async () => {
+    let root = await prepareStarterArchive({
+      scripts: {
+        prep: 'node scripts/prep.js',
+      },
+    })
+    let stdout = { log: vi.fn() }
+    let run = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('prep failed'))
+    let projectRoot = join(root, 'demo')
+
+    await expect(
+      createProject(
+        sampleCatalog[0]!,
+        {
+          projectName: 'demo',
+          targetDir: projectRoot,
+          install: true,
+          git: false,
+        },
+        {
+          initGit: vi.fn(),
+          promptConfirm: vi.fn().mockResolvedValue(true),
+          run,
+          stdout,
+        },
+      ),
+    ).resolves.toBe(projectRoot)
+
+    expect(stdout.log).toHaveBeenCalledWith(
+      expect.stringContaining('Project setup failed. prep failed'),
+    )
+    expect(stdout.log).toHaveBeenCalledWith(
+      expect.stringContaining(`cd ${projectRoot} && pnpm prep`),
     )
   })
 })
 
-async function prepareStarterArchive() {
+async function prepareStarterArchive(
+  overrides: {
+    scripts?: Record<string, string>
+  } = {},
+) {
   let root = await mkdtemp(join(tmpdir(), 'gistajs-test-'))
   tempRoots.push(root)
 
@@ -163,7 +373,15 @@ async function prepareStarterArchive() {
   await mkdir(sourceRoot, { recursive: true })
   await writeFile(
     join(sourceRoot, 'package.json'),
-    `${JSON.stringify({ name: 'website', gistajs: { pin: 'website:2026-03-30-001' } }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: 'website',
+        ...(overrides.scripts ? { scripts: overrides.scripts } : {}),
+        gistajs: { pin: 'website:2026-03-30-001' },
+      },
+      null,
+      2,
+    )}\n`,
   )
 
   let archivePath = join(root, 'website.tgz')

@@ -17,18 +17,23 @@ import * as tar from 'tar'
 import { c } from '../utils/color.js'
 import type { CliDeps } from '../utils/deps.js'
 import { initGit } from '../utils/git.js'
+import { promptConfirm } from '../utils/prompt.js'
 import { run } from '../utils/subprocess.js'
 import type { CreateOptions, StarterSpec } from '../utils/types.js'
 import { UsageError } from './error.js'
 
 type CreateProjectDeps = {
   initGit: typeof initGit
+  promptConfirm: typeof promptConfirm
   run: typeof run
+  stdout: Pick<typeof console, 'log'>
 }
 
 const defaultCreateProjectDeps: CreateProjectDeps = {
   initGit,
+  promptConfirm,
   run,
+  stdout: console,
 }
 
 export function parseCreateArgs(argv: string[]): CreateOptions {
@@ -139,6 +144,10 @@ export async function createProject(
 
     if (options.install !== false) {
       await installDependencies(root, deps.run)
+
+      if (await hasPrepScript(root)) {
+        await runPrepScript(root, deps)
+      }
     }
 
     return root
@@ -221,8 +230,35 @@ async function rewritePackageName(root: string, projectName: string) {
 }
 
 async function installDependencies(root: string, runCommand: typeof run) {
+  await runPnpmCommand(root, runCommand, 'install')
+}
+
+async function runPrepScript(
+  root: string,
+  deps: Pick<CreateProjectDeps, 'promptConfirm' | 'run' | 'stdout'>,
+) {
+  let shouldRun = await deps.promptConfirm('Run project setup now? (Y/n) ')
+
+  if (!shouldRun) return
+
   try {
-    await runCommand('corepack', ['pnpm', 'install'], root)
+    await runPnpmCommand(root, deps.run, 'prep')
+  } catch (error) {
+    let detail = error instanceof Error ? error.message : String(error)
+    deps.stdout.log(`Warning: Project setup failed. ${detail}`)
+    deps.stdout.log(
+      `Run ${c.path(`cd ${root} && pnpm prep`)} to retry project setup.`,
+    )
+  }
+}
+
+async function runPnpmCommand(
+  root: string,
+  runCommand: typeof run,
+  script: 'install' | 'prep',
+) {
+  try {
+    await runCommand('corepack', ['pnpm', script], root)
     return
   } catch (error) {
     if (!isCommandNotFound(error)) {
@@ -231,16 +267,26 @@ async function installDependencies(root: string, runCommand: typeof run) {
   }
 
   try {
-    await runCommand('pnpm', ['install'], root)
+    await runCommand('pnpm', [script], root)
   } catch (error) {
     if (!isCommandNotFound(error)) {
       throw error
     }
 
     throw new Error(
-      'Could not install dependencies because neither corepack nor pnpm is available. Install Node.js with corepack enabled, or install pnpm and rerun the command.',
+      `Could not run pnpm ${script} because neither corepack nor pnpm is available. Install Node.js with corepack enabled, or install pnpm and rerun the command.`,
     )
   }
+}
+
+async function hasPrepScript(root: string) {
+  let path = join(root, 'package.json')
+  let source = await readFile(path, 'utf8')
+  let pkg = JSON.parse(source) as {
+    scripts?: Record<string, unknown>
+  }
+
+  return typeof pkg.scripts?.prep === 'string' && pkg.scripts.prep.length > 0
 }
 
 function getErrorCode(error: unknown) {

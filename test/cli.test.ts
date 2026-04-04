@@ -102,6 +102,49 @@ describe('runCli', () => {
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
   })
 
+  it('dispatches create with prompted git/install options', async () => {
+    let deps = makeCliDeps({
+      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
+      createProject: vi.fn().mockResolvedValue('/tmp/my-app'),
+      promptConfirm: vi
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true),
+    })
+
+    await runCli(['create', 'my-app', '--starter', 'website'], deps)
+
+    expect(deps.promptConfirm).toHaveBeenNthCalledWith(
+      1,
+      'Initialize git? (Y/n) ',
+    )
+    expect(deps.promptConfirm).toHaveBeenNthCalledWith(
+      2,
+      'Install dependencies? (Y/n) ',
+    )
+    expect(deps.createProject).toHaveBeenCalledWith(sampleCatalog[0], {
+      projectName: 'my-app',
+      starter: 'website',
+      git: true,
+      install: true,
+    })
+  })
+
+  it('does not prompt for starter selection when create receives a starter slug', async () => {
+    let deps = makeCliDeps({
+      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
+      createProject: vi.fn().mockResolvedValue('/tmp/my-app'),
+      promptConfirm: vi
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false),
+    })
+
+    await runCli(['create', 'my-app', '--starter', 'website'], deps)
+
+    expect(deps.promptForStarter).not.toHaveBeenCalled()
+  })
+
   it('prints diff help for bare diff invocation', async () => {
     let deps = makeCliDeps()
 

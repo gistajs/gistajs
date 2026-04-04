@@ -15,6 +15,8 @@ export function getHelpText(command?: string) {
       `    ${c.dim('$')} gistajs create my-app`,
       `    ${c.dim('$')} gistajs create my-app --starter website`,
       '',
+      `  Some starters offer an optional setup step after dependencies install.`,
+      '',
     ].join('\n')
   }
 
@@ -84,6 +86,9 @@ export function getHelpText(command?: string) {
     `  ${c.bold('Examples:')}`,
     `    ${c.dim('$')} gistajs create my-app`,
     `    ${c.dim('$')} gistajs create my-app --starter website`,
+    '',
+    `  Some starters offer an optional setup step after dependencies install.`,
+    '',
     `    ${c.dim('$')} gistajs diff --latest`,
     `    ${c.dim('$')} gistajs diff --latest --stat`,
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,

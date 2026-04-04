@@ -10,6 +10,7 @@ npx gistajs create my-app --starter website --no-install --no-git
 ```
 
 Today the CLI covers project creation, starter diffs, pin management, Turso provisioning, and Vercel provisioning.
+For starters that define `pnpm prep`, `gistajs create` offers to run that setup step after dependencies install.
 
 ### Diff
 
