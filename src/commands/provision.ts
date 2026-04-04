@@ -65,6 +65,7 @@ type ProjectPackage = Record<string, unknown> & {
     providers?: string[]
     region?: string
   }
+  scripts?: Record<string, string>
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
 }
@@ -76,6 +77,7 @@ type ProjectProvisionDeps = Pick<
   | 'cwd'
   | 'getCliVersion'
   | 'getDefaultProvisionRegion'
+  | 'promptConfirm'
   | 'promptText'
   | 'provisionTurso'
   | 'provisionVercel'
@@ -114,23 +116,24 @@ async function runProjectProvision(deps: ProjectProvisionDeps) {
     skipped: [],
     pending: [],
   }
-  let shouldApplySchema = false
-  let appliedSchema = false
+  let shouldOfferPrepProd =
+    providers.includes('turso') &&
+    providers.includes('vercel') &&
+    Boolean(pkg.scripts?.['prep:prod'])
+  let ranPrepProd = false
 
   for (let provider of providers) {
     if (provider === 'turso') {
       let result = await deps.provisionTurso(deps.cwd, region)
       summary[result.status].push(result.provider)
-      shouldApplySchema =
-        result.status === 'completed' || result.status === 'skipped'
       continue
     }
 
     if (provider === 'vercel') {
-      if (shouldApplySchema && !appliedSchema) {
-        await applyProductionSchema(deps)
-        summary.completed.push('atlas')
-        appliedSchema = true
+      if (shouldOfferPrepProd && !ranPrepProd) {
+        let ran = await maybeRunProductionSetup(deps)
+        summary[ran ? 'completed' : 'skipped'].push('prep:prod')
+        ranPrepProd = true
       }
 
       let result = await deps.provisionVercel(deps.cwd, region)
@@ -140,11 +143,6 @@ async function runProjectProvision(deps: ProjectProvisionDeps) {
 
     deps.stdout.log(`Skipping ${provider}. This provider is not supported yet.`)
     summary.pending.push(provider)
-  }
-
-  if (shouldApplySchema && !appliedSchema) {
-    await applyProductionSchema(deps)
-    summary.completed.push('atlas')
   }
 
   printSummary(summary, deps)
@@ -213,18 +211,20 @@ async function getPromptDefaultRegion(
   return getDefaultSharedRegion()
 }
 
-async function applyProductionSchema(
-  deps: Pick<CliDeps, 'cwd' | 'runProjectCommand' | 'stdout'>,
+async function maybeRunProductionSetup(
+  deps: Pick<CliDeps, 'cwd' | 'promptConfirm' | 'runProjectCommand'>,
 ) {
+  let shouldRun = await deps.promptConfirm('Run production setup now? (Y/n) ')
+
+  if (!shouldRun) return false
+
   try {
-    await deps.runProjectCommand(deps.cwd, 'atlas:prod')
+    await deps.runProjectCommand(deps.cwd, 'prep:prod')
   } catch {
-    throw new Error(
-      'Could not apply production schema. Run `pnpm atlas:prod` manually.',
-    )
+    throw new Error('Production setup failed. Run `pnpm prep:prod` manually.')
   }
 
-  deps.stdout.log('Applied production schema.')
+  return true
 }
 
 function printSummary(

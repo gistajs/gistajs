@@ -188,6 +188,7 @@ describe('runCli', () => {
       getDefaultProvisionRegion: vi
         .fn()
         .mockResolvedValue('aws-ap-northeast-1'),
+      promptConfirm: vi.fn().mockResolvedValue(true),
       provisionTurso: vi.fn().mockImplementation(async () => {
         steps.push('turso')
 
@@ -197,7 +198,7 @@ describe('runCli', () => {
         }
       }),
       runProjectCommand: vi.fn().mockImplementation(async () => {
-        steps.push('atlas:prod')
+        steps.push('prep:prod')
       }),
       provisionVercel: vi.fn().mockImplementation(async () => {
         steps.push('vercel')
@@ -218,22 +219,21 @@ describe('runCli', () => {
     })
     expect(deps.runProjectCommand).toHaveBeenCalledWith(
       '/tmp/demo',
-      'atlas:prod',
+      'prep:prod',
     )
     expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
       id: 'aws-ap-northeast-1',
       label: 'Tokyo',
       vercel: 'hnd1',
     })
-    expect(steps).toEqual(['turso', 'atlas:prod', 'vercel'])
-    expect(deps.stdout.log).toHaveBeenCalledWith('Applied production schema.')
+    expect(steps).toEqual(['turso', 'prep:prod', 'vercel'])
     expect(deps.stdout.log).toHaveBeenCalledWith('Provision summary')
     expect(deps.stdout.log).toHaveBeenCalledWith(
-      'completed: turso, atlas, vercel',
+      'completed: turso, prep:prod, vercel',
     )
   })
 
-  it('runs atlas after a skipped Turso step and before Vercel', async () => {
+  it('can skip prep:prod and continue to Vercel', async () => {
     let steps: string[] = []
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
@@ -243,16 +243,17 @@ describe('runCli', () => {
           makeProjectPackage({ providers: ['turso', 'vercel'] }),
         ),
       promptText: vi.fn().mockResolvedValue(''),
+      promptConfirm: vi.fn().mockResolvedValue(false),
       provisionTurso: vi.fn().mockImplementation(async () => {
         steps.push('turso')
 
         return {
           provider: 'turso',
-          status: 'skipped',
+          status: 'completed',
         }
       }),
       runProjectCommand: vi.fn().mockImplementation(async () => {
-        steps.push('atlas:prod')
+        steps.push('prep:prod')
       }),
       provisionVercel: vi.fn().mockImplementation(async () => {
         steps.push('vercel')
@@ -266,12 +267,13 @@ describe('runCli', () => {
 
     await runCli(['provision'], deps)
 
-    expect(steps).toEqual(['turso', 'atlas:prod', 'vercel'])
-    expect(deps.stdout.log).toHaveBeenCalledWith('completed: atlas, vercel')
-    expect(deps.stdout.log).toHaveBeenCalledWith('skipped: turso')
+    expect(steps).toEqual(['turso', 'vercel'])
+    expect(deps.runProjectCommand).not.toHaveBeenCalled()
+    expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso, vercel')
+    expect(deps.stdout.log).toHaveBeenCalledWith('skipped: prep:prod')
   })
 
-  it('stops before Vercel when atlas:prod fails', async () => {
+  it('stops before Vercel when prep:prod fails', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
       readFile: vi
@@ -280,6 +282,7 @@ describe('runCli', () => {
           makeProjectPackage({ providers: ['turso', 'vercel'] }),
         ),
       promptText: vi.fn().mockResolvedValue(''),
+      promptConfirm: vi.fn().mockResolvedValue(true),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
         status: 'completed',
@@ -289,7 +292,7 @@ describe('runCli', () => {
     })
 
     await expect(runCli(['provision'], deps)).rejects.toThrow(
-      'Could not apply production schema. Run `pnpm atlas:prod` manually.',
+      'Production setup failed. Run `pnpm prep:prod` manually.',
     )
 
     expect(deps.provisionVercel).not.toHaveBeenCalled()
@@ -440,6 +443,7 @@ function makeProjectPackage(
     providers?: string[]
     requirement?: string
     region?: string
+    scripts?: Record<string, string>
   } = {},
 ) {
   return JSON.stringify({
@@ -450,6 +454,9 @@ function makeProjectPackage(
     },
     devDependencies: {
       gistajs: overrides.requirement ?? '^0.1.3',
+    },
+    scripts: overrides.scripts ?? {
+      'prep:prod': 'node scripts/prep-prod.js',
     },
   })
 }
@@ -465,7 +472,7 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     provisionTurso: vi.fn(),
     provisionVercel: vi.fn(),
     promptForStarter: vi.fn(),
-    promptConfirm: vi.fn(),
+    promptConfirm: vi.fn().mockResolvedValue(true),
     promptText: vi.fn(),
     readFile: vi.fn(),
     writeFile: vi.fn(),
