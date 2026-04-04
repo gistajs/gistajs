@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { provisionTurso } from '../src/providers/turso.js'
+import { provisionVercel } from '../src/providers/vercel.js'
+
+let oregon = {
+  id: 'aws-us-west-2',
+  label: 'Oregon',
+  vercel: 'sfo1',
+}
 
 describe('provisionTurso', () => {
   it('requires an interactive terminal', async () => {
     await expect(
-      provisionTurso('/tmp/demo', makeDeps({ isTTY: false })),
+      provisionTurso('/tmp/demo', oregon, makeDeps({ isTTY: false })),
     ).rejects.toThrow('requires an interactive terminal')
   })
 
@@ -16,7 +23,7 @@ describe('provisionTurso', () => {
       promptConfirm: vi.fn().mockResolvedValue(false),
     })
 
-    await expect(provisionTurso('/tmp/demo', deps)).resolves.toEqual({
+    await expect(provisionTurso('/tmp/demo', oregon, deps)).resolves.toEqual({
       provider: 'turso',
       status: 'skipped',
     })
@@ -25,9 +32,13 @@ describe('provisionTurso', () => {
     expect(deps.writeFile).not.toHaveBeenCalled()
   })
 
-  it('fails clearly when no groups can be parsed', async () => {
+  it('fails clearly when a new region group cannot be created', async () => {
     let deps = makeDeps({
-      run: vi.fn().mockResolvedValue(undefined),
+      run: vi.fn(async (_command, args) => {
+        if (args[0] === 'group' && args[1] === 'create') {
+          throw new Error('boom')
+        }
+      }),
       runOutput: vi.fn(async (_command, args) => {
         if (args.join(' ') === 'org list') {
           return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
@@ -46,8 +57,8 @@ describe('provisionTurso', () => {
       promptText: vi.fn().mockResolvedValue(''),
     })
 
-    await expect(provisionTurso('/tmp/demo', deps)).rejects.toThrow(
-      'Could not read any Turso groups',
+    await expect(provisionTurso('/tmp/demo', oregon, deps)).rejects.toThrow(
+      'Could not create a Turso group in Oregon',
     )
   })
 
@@ -79,12 +90,132 @@ describe('provisionTurso', () => {
       promptText: vi.fn().mockResolvedValue('demo'),
     })
 
-    await expect(provisionTurso('/tmp/demo', deps)).resolves.toEqual({
+    await expect(provisionTurso('/tmp/demo', oregon, deps)).resolves.toEqual({
       provider: 'turso',
       status: 'completed',
     })
 
     expect(deps.writeFile).toHaveBeenCalledOnce()
+  })
+
+  it('creates a new group when no group matches the selected region', async () => {
+    let deps = makeDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'org list') {
+          return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
+        }
+
+        if (args.join(' ') === 'db list') {
+          return 'NAME GROUP LOCATIONS\n'
+        }
+
+        if (args.join(' ') === 'group list') {
+          return 'NAME LOCATION\ndefault aws-us-east-1\n'
+        }
+
+        if (args.join(' ') === 'db show demo --url') {
+          return 'libsql://demo.turso.io'
+        }
+
+        if (args.join(' ') === 'db tokens create demo') {
+          return 'secret-token'
+        }
+
+        return ''
+      }),
+      promptText: vi.fn().mockResolvedValue('demo'),
+    })
+
+    await provisionTurso('/tmp/demo', oregon, deps)
+
+    expect(deps.run).toHaveBeenCalledWith(
+      'turso',
+      ['group', 'create', 'demo-oregon', '--location', 'aws-us-west-2'],
+      '/tmp/demo',
+    )
+  })
+})
+
+describe('provisionVercel', () => {
+  it('requires an interactive terminal', async () => {
+    await expect(
+      provisionVercel('/tmp/demo', oregon, makeVercelDeps({ isTTY: false })),
+    ).rejects.toThrow('requires an interactive terminal')
+  })
+
+  it('fails clearly when required env vars are missing', async () => {
+    await expect(
+      provisionVercel(
+        '/tmp/demo',
+        oregon,
+        makeVercelDeps({
+          readFile: vi.fn().mockResolvedValue('COOKIE_SECRET=\n'),
+        }),
+      ),
+    ).rejects.toThrow('Missing COOKIE_SECRET in .env')
+  })
+
+  it('updates existing env vars and adds missing ones', async () => {
+    let deps = makeVercelDeps({
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+      runOutput: vi
+        .fn()
+        .mockResolvedValue(
+          'NAME VALUE TARGET\nCOOKIE_SECRET encrypted production\n',
+        ),
+    })
+
+    await expect(provisionVercel('/tmp/demo', oregon, deps)).resolves.toEqual({
+      provider: 'vercel',
+      status: 'completed',
+    })
+
+    expect(deps.runInput.mock.calls).toEqual([
+      [
+        'vercel',
+        [
+          'env',
+          'update',
+          'COOKIE_SECRET',
+          'production',
+          '--yes',
+          '--sensitive',
+        ],
+        '/tmp/demo',
+        'secret\n',
+      ],
+      [
+        'vercel',
+        ['env', 'add', 'DB_URL', 'production', '--force', '--sensitive'],
+        '/tmp/demo',
+        'libsql://demo\n',
+      ],
+      [
+        'vercel',
+        ['env', 'add', 'DB_AUTH_TOKEN', 'production', '--force', '--sensitive'],
+        '/tmp/demo',
+        'token\n',
+      ],
+    ])
+  })
+
+  it('links the project when .vercel/project.json is missing', async () => {
+    let deps = makeVercelDeps({
+      existsSync: vi.fn().mockReturnValue(false),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await provisionVercel('/tmp/demo', oregon, deps)
+
+    expect(deps.run).toHaveBeenCalledWith('vercel', ['link'], '/tmp/demo')
   })
 })
 
@@ -97,6 +228,19 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
     readFile: vi.fn().mockResolvedValue(''),
     writeFile: vi.fn().mockResolvedValue(undefined),
     cp: vi.fn().mockResolvedValue(undefined),
+    stdout: { log: vi.fn() },
+    isTTY: true,
+    ...overrides,
+  }
+}
+
+function makeVercelDeps(overrides: Record<string, unknown> = {}) {
+  return {
+    run: vi.fn().mockResolvedValue(undefined),
+    runInput: vi.fn().mockResolvedValue(undefined),
+    runOutput: vi.fn().mockResolvedValue('NAME VALUE TARGET\n'),
+    readFile: vi.fn().mockResolvedValue(''),
+    existsSync: vi.fn().mockReturnValue(true),
     stdout: { log: vi.fn() },
     isTTY: true,
     ...overrides,

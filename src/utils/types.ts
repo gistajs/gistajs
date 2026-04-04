@@ -41,6 +41,12 @@ export type ProvisionOptions = {
   provider?: ProvisionProvider | string
 }
 
+export type ProvisionRegion = {
+  id: string
+  label: string
+  vercel: string
+}
+
 export type ProvisionResult = {
   provider: ProvisionProvider | string
   status: ProvisionStatus

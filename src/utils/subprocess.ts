@@ -5,7 +5,9 @@ export async function run(
   args: string[],
   cwd: string,
 ): Promise<void> {
-  await exec(command, args, cwd, false)
+  await exec(command, args, cwd, {
+    capture: false,
+  })
 }
 
 export async function runOutput(
@@ -13,24 +15,43 @@ export async function runOutput(
   args: string[],
   cwd: string,
 ): Promise<string> {
-  return await exec(command, args, cwd, true)
+  return await exec(command, args, cwd, {
+    capture: true,
+  })
+}
+
+export async function runInput(
+  command: string,
+  args: string[],
+  cwd: string,
+  input: string,
+): Promise<void> {
+  await exec(command, args, cwd, {
+    capture: false,
+    input,
+  })
 }
 
 async function exec(
   command: string,
   args: string[],
   cwd: string,
-  capture: boolean,
+  options: {
+    capture: boolean
+    input?: string
+  },
 ) {
   return await new Promise<string>((resolve, reject) => {
+    let { capture, input } = options
+    let captureOutput = capture || input !== undefined
     let stdout = ''
     let stderr = ''
     let child = spawn(command, args, {
       cwd,
-      stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      stdio: captureOutput ? ['pipe', 'pipe', 'pipe'] : 'inherit',
     })
 
-    if (capture) {
+    if (captureOutput) {
       child.stdout!.on('data', (chunk) => {
         stdout += String(chunk)
       })
@@ -40,6 +61,10 @@ async function exec(
       })
     }
 
+    if (input !== undefined) {
+      child.stdin!.end(input)
+    }
+
     child.once('error', reject)
     child.once('exit', (code) => {
       if (code === 0) {
@@ -47,7 +72,7 @@ async function exec(
         return
       }
 
-      let detail = capture ? stderr.trim() : ''
+      let detail = captureOutput ? stderr.trim() : ''
       reject(
         new Error(
           detail || `${command} ${args.join(' ')} exited with code ${code}`,

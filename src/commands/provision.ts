@@ -1,3 +1,9 @@
+import {
+  getDefaultSharedRegion,
+  getSharedRegion,
+  parseSharedRegion,
+  sharedRegions,
+} from '../providers/regions.js'
 import type { CliDeps } from '../utils/deps.js'
 import type { ProvisionOptions, ProvisionStatus } from '../utils/types.js'
 import { satisfiesVersion } from '../utils/version.js'
@@ -34,22 +40,30 @@ export async function runProvisionCommand(argv: string[], deps: CliDeps) {
 }
 
 async function runProviderProvision(provider: string, deps: CliDeps) {
+  if (provider !== 'turso' && provider !== 'vercel') {
+    throw new UsageError(`Unknown provider: ${provider}`, 'provision')
+  }
+
+  let pkg = await readProjectPackage(deps)
+  let region = await resolveProjectRegion(pkg, deps)
+  await writeProjectRegion(pkg, region.id, deps)
+
   if (provider === 'turso') {
-    await deps.provisionTurso(deps.cwd)
+    await deps.provisionTurso(deps.cwd, region)
     return
   }
 
   if (provider === 'vercel') {
-    throw new Error('`gistajs provision vercel` is not implemented yet')
+    await deps.provisionVercel(deps.cwd, region)
+    return
   }
-
-  throw new UsageError(`Unknown provider: ${provider}`, 'provision')
 }
 
 type ProjectPackage = {
   gistajs?: {
     pin?: string
     providers?: string[]
+    region?: string
   }
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
@@ -78,6 +92,8 @@ async function runProjectProvision(deps: CliDeps) {
 
   let cliVersion = await deps.getCliVersion()
   assertCliVersion(cliVersion, requirement)
+  let region = await resolveProjectRegion(pkg, deps)
+  await writeProjectRegion(pkg, region.id, deps)
 
   let summary: ProvisionSummary = {
     completed: [],
@@ -87,16 +103,14 @@ async function runProjectProvision(deps: CliDeps) {
 
   for (let provider of providers) {
     if (provider === 'turso') {
-      let result = await deps.provisionTurso(deps.cwd)
+      let result = await deps.provisionTurso(deps.cwd, region)
       summary[result.status].push(result.provider)
       continue
     }
 
     if (provider === 'vercel') {
-      deps.stdout.log(
-        'Skipping vercel. `gistajs provision vercel` is not implemented yet.',
-      )
-      summary.pending.push(provider)
+      let result = await deps.provisionVercel(deps.cwd, region)
+      summary[result.status].push(result.provider)
       continue
     }
 
@@ -127,6 +141,52 @@ async function readProjectPackage(deps: Pick<CliDeps, 'cwd' | 'readFile'>) {
     }
 
     throw error
+  }
+}
+
+async function writeProjectRegion(
+  pkg: ProjectPackage,
+  region: string,
+  deps: Pick<CliDeps, 'cwd' | 'writeFile'>,
+) {
+  let nextPkg = {
+    ...pkg,
+    gistajs: {
+      ...(pkg.gistajs || {}),
+      region,
+    },
+  }
+
+  await deps.writeFile(
+    `${deps.cwd}/package.json`,
+    `${JSON.stringify(nextPkg, null, 2)}\n`,
+    'utf8',
+  )
+}
+
+async function resolveProjectRegion(
+  pkg: ProjectPackage,
+  deps: Pick<CliDeps, 'promptText' | 'stdout'>,
+) {
+  let current = pkg.gistajs?.region ? getSharedRegion(pkg.gistajs.region) : null
+  let fallback = current || getDefaultSharedRegion()
+  let labels = sharedRegions.map((region) => region.label).join(', ')
+
+  deps.stdout.log(`Available regions: ${labels}`)
+
+  if (pkg.gistajs?.region && !current) {
+    deps.stdout.log(
+      `Current region "${pkg.gistajs.region}" is no longer supported. Choose a new shared region.`,
+    )
+  }
+
+  while (true) {
+    let answer = await deps.promptText(`Region (${fallback.label}): `)
+    let selected = parseSharedRegion(answer.trim() || fallback.id)
+
+    if (selected) return selected
+
+    deps.stdout.log(`Invalid region. Choose from: ${labels}`)
   }
 }
 

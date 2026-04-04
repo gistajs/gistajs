@@ -209,6 +209,12 @@ describe('runCli', () => {
   it('dispatches Turso provisioning from the current directory', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          makeProjectPackage({ providers: ['turso', 'vercel'] }),
+        ),
+      promptText: vi.fn().mockResolvedValue(''),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
         status: 'completed',
@@ -217,28 +223,53 @@ describe('runCli', () => {
 
     await runCli(['provision', 'turso'], deps)
 
-    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo')
+    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-us-west-2',
+      label: 'Oregon',
+      vercel: 'sfo1',
+    })
   })
 
   it('dispatches project-aware provision from package metadata', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
-      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          makeProjectPackage({ providers: ['turso', 'vercel'] }),
+        ),
+      promptText: vi.fn().mockResolvedValue(''),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
+        status: 'completed',
+      }),
+      provisionVercel: vi.fn().mockResolvedValue({
+        provider: 'vercel',
         status: 'completed',
       }),
     })
 
     await runCli(['provision'], deps)
 
-    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo')
+    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-us-west-2',
+      label: 'Oregon',
+      vercel: 'sfo1',
+    })
+    expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-us-west-2',
+      label: 'Oregon',
+      vercel: 'sfo1',
+    })
     expect(deps.stdout.log).toHaveBeenCalledWith('Provision summary')
-    expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso')
+    expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso, vercel')
   })
 
   it('rejects unknown provision providers', async () => {
-    let deps = makeCliDeps()
+    let deps = makeCliDeps({
+      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
+      promptText: vi.fn().mockResolvedValue(''),
+    })
 
     await expect(runCli(['provision', 'fly'], deps)).rejects.toThrow(
       'Unknown provider: fly',
@@ -257,20 +288,48 @@ describe('runCli', () => {
     )
   })
 
-  it('reports pending providers declared by the starter', async () => {
+  it('dispatches Vercel provisioning from the current directory', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
+      promptText: vi.fn().mockResolvedValue('Virginia'),
+      provisionVercel: vi.fn().mockResolvedValue({
+        provider: 'vercel',
+        status: 'completed',
+      }),
+    })
+
+    await runCli(['provision', 'vercel'], deps)
+
+    expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-us-east-1',
+      label: 'Virginia',
+      vercel: 'iad1',
+    })
+  })
+
+  it('keeps an existing saved region when the prompt is left blank', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
       readFile: vi
         .fn()
-        .mockResolvedValue(makeProjectPackage({ providers: ['vercel'] })),
+        .mockResolvedValue(
+          makeProjectPackage({ region: 'aws-ap-northeast-1' }),
+        ),
+      promptText: vi.fn().mockResolvedValue(''),
+      provisionVercel: vi.fn().mockResolvedValue({
+        provider: 'vercel',
+        status: 'completed',
+      }),
     })
 
-    await runCli(['provision'], deps)
+    await runCli(['provision', 'vercel'], deps)
 
-    expect(deps.stdout.log).toHaveBeenCalledWith(
-      'Skipping vercel. `gistajs provision vercel` is not implemented yet.',
-    )
-    expect(deps.stdout.log).toHaveBeenCalledWith('pending: vercel')
+    expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-ap-northeast-1',
+      label: 'Tokyo',
+      vercel: 'hnd1',
+    })
   })
 
   it('fails clearly when package.json is missing', async () => {
@@ -326,12 +385,17 @@ describe('main', () => {
 })
 
 function makeProjectPackage(
-  overrides: { providers?: string[]; requirement?: string } = {},
+  overrides: {
+    providers?: string[]
+    requirement?: string
+    region?: string
+  } = {},
 ) {
   return JSON.stringify({
     gistajs: {
       pin: 'form:2026-04-01-001',
       providers: overrides.providers ?? ['turso'],
+      ...(overrides.region ? { region: overrides.region } : {}),
     },
     devDependencies: {
       gistajs: overrides.requirement ?? '^0.1.3',
@@ -348,9 +412,12 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     readProjectStarterPin: vi.fn(),
     writeProjectStarterPin: vi.fn(),
     provisionTurso: vi.fn(),
+    provisionVercel: vi.fn(),
     promptForStarter: vi.fn(),
     promptConfirm: vi.fn(),
+    promptText: vi.fn(),
     readFile: vi.fn(),
+    writeFile: vi.fn(),
     stdout: { log: vi.fn() },
     cwd: process.cwd(),
     getCliVersion: vi.fn().mockResolvedValue('0.1.3'),

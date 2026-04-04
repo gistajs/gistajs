@@ -60,11 +60,12 @@ export function getHelpText(command?: string) {
       '',
       `  ${c.bold('Providers:')}`,
       `    turso    Create a Turso database and save credentials to .env`,
-      `    vercel   Reserved for deployment provisioning`,
+      `    vercel   Link Vercel and sync production env vars`,
       '',
       `  ${c.bold('Examples:')}`,
       `    ${c.dim('$')} gistajs provision`,
       `    ${c.dim('$')} gistajs provision turso`,
+      `    ${c.dim('$')} gistajs provision vercel`,
       '',
     ].join('\n')
   }
@@ -90,6 +91,7 @@ export function getHelpText(command?: string) {
     `    ${c.dim('$')} gistajs pin 2026-04-01-001`,
     `    ${c.dim('$')} gistajs provision`,
     `    ${c.dim('$')} gistajs provision turso`,
+    `    ${c.dim('$')} gistajs provision vercel`,
     '',
   ].join('\n')
 }

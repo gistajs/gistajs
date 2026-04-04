@@ -3,7 +3,8 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { promptConfirm, promptText } from '../utils/prompt.js'
 import { run, runOutput } from '../utils/subprocess.js'
-import type { ProvisionResult } from '../utils/types.js'
+import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
+import { getSharedRegion } from './regions.js'
 
 type ProvisionDeps = {
   run: typeof run
@@ -31,6 +32,7 @@ const defaultDeps: ProvisionDeps = {
 
 export async function provisionTurso(
   cwd: string,
+  region: ProvisionRegion,
   deps: ProvisionDeps = defaultDeps,
 ): Promise<ProvisionResult> {
   if (!deps.isTTY) {
@@ -104,15 +106,9 @@ export async function provisionTurso(
   let existingDbs = new Set(
     parseFirstColumn(await deps.runOutput('turso', ['db', 'list'], cwd)),
   )
-  let groups = parseFirstColumn(
+  let groups = parseGroupTable(
     await deps.runOutput('turso', ['group', 'list'], cwd),
   )
-
-  if (groups.length === 0) {
-    throw new Error(
-      'Could not read any Turso groups. Create one first or check `turso group list`.',
-    )
-  }
 
   let fallback = basename(cwd).replaceAll('.', '-')
   let name = ''
@@ -126,18 +122,26 @@ export async function provisionTurso(
     deps.stdout.log(`Database "${name}" already exists. Pick a different name.`)
   }
 
-  let group = groups[0]
+  let group = groups.find((entry) =>
+    matchesRegion(entry.location, region),
+  )?.name
 
-  if (groups.length > 1) {
-    deps.stdout.log(`\nAvailable groups: ${groups.join(', ')}`)
+  if (!group) {
+    group = `${fallback}-${region.label.toLowerCase().replaceAll(/\s+/g, '-')}`
+    deps.stdout.log(
+      `No Turso group found in ${region.label}. Creating "${group}"...`,
+    )
 
-    while (true) {
-      let answer = await deps.promptText(`Group (${groups[0]}): `)
-      group = answer.trim() || groups[0]
-
-      if (groups.includes(group)) break
-
-      deps.stdout.log(`Invalid group. Choose from: ${groups.join(', ')}`)
+    try {
+      await deps.run(
+        'turso',
+        ['group', 'create', group, '--location', region.id],
+        cwd,
+      )
+    } catch (error) {
+      throw new Error(
+        `Could not create a Turso group in ${region.label}. Check \`turso group create\` permissions and try again.`,
+      )
     }
   }
 
@@ -229,6 +233,23 @@ function parseFirstColumn(table: string) {
     .filter(Boolean)
 }
 
+function parseGroupTable(table: string) {
+  return table
+    .trim()
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      let parts = line.split(/\s+/)
+      return {
+        name: parts[0] || '',
+        location: parts[1] || '',
+      }
+    })
+    .filter((group) => group.name)
+}
+
 function parseOrgTable(table: string) {
   return table
     .trim()
@@ -244,4 +265,20 @@ function parseOrgTable(table: string) {
       }
     })
     .filter((org) => org.slug)
+}
+
+function matchesRegion(location: string, region: ProvisionRegion) {
+  if (!location) return false
+
+  let normalized = location.trim().toLowerCase()
+
+  if (normalized === region.id) return true
+
+  let shared = getSharedRegion(region.id)
+
+  if (!shared) return false
+
+  return (
+    normalized === shared.vercel || normalized === shared.label.toLowerCase()
+  )
 }

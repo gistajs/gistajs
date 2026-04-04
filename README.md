@@ -9,8 +9,7 @@ npx gistajs create my-app
 npx gistajs create my-app --starter website --no-install --no-git
 ```
 
-Today the CLI covers project creation, starter diffs, pin management, and Turso provisioning.
-Vercel provisioning is the next intended provider in the same command family.
+Today the CLI covers project creation, starter diffs, pin management, Turso provisioning, and Vercel provisioning.
 
 ### Diff
 
@@ -58,16 +57,17 @@ Provision the current project from its `package.json` metadata:
 npx gistajs provision
 ```
 
-For starters that declare Turso, this provisions a database and writes `DB_URL` plus `DB_AUTH_TOKEN` into `.env`.
+For starters that declare Turso and Vercel, this prompts for a shared deployment region, provisions Turso first, writes `DB_URL` plus `DB_AUTH_TOKEN` into `.env`, and then syncs `COOKIE_SECRET`, `DB_URL`, and `DB_AUTH_TOKEN` to Vercel production envs.
 The command checks the project's declared `gistajs` dependency first and fails clearly if the installed CLI is too old.
 
 You can still run a provider directly when debugging:
 
 ```bash
 npx gistajs provision turso
+npx gistajs provision vercel
 ```
 
-The command is interactive. It checks Turso login state, lets you choose an org when needed, prompts for a database name and group, and asks before overwriting existing database credentials in `.env`.
+The command is interactive. It asks for a shared region first, defaults new projects to Oregon, reuses the saved region on later runs, creates a Turso group in that region when needed, links Vercel when needed, and asks before overwriting existing database credentials in `.env`.
 
 ## Development
 
