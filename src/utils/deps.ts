@@ -12,6 +12,8 @@ import { loadCatalog } from './catalog.js'
 import { promptConfirm, promptForStarter, promptText } from './prompt.js'
 import { loadStarterRelease } from './releases.js'
 
+declare const __GISTAJS_VERSION__: string
+
 type ReadTextFile = (path: string, encoding: 'utf8') => Promise<string>
 type WriteTextFile = (
   path: string,
@@ -39,17 +41,11 @@ export type CliDeps = {
 }
 
 async function readCliVersion() {
-  let file = await readFile(
-    new URL('../../package.json', import.meta.url),
-    'utf8',
-  )
-  let pkg = JSON.parse(file) as { version?: string }
-
-  if (!pkg.version) {
+  if (!__GISTAJS_VERSION__) {
     throw new Error('Could not resolve the installed gistajs version')
   }
 
-  return pkg.version
+  return __GISTAJS_VERSION__
 }
 
 export const defaultDeps: CliDeps = {
