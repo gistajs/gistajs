@@ -32,6 +32,26 @@ export async function runInput(
   })
 }
 
+export async function assertCommand(
+  runFn: typeof run,
+  cwd: string,
+  command: string,
+  args: string[],
+  failureMessage: string,
+) {
+  try {
+    await runFn(command, args, cwd)
+  } catch (error) {
+    let code = (error as NodeJS.ErrnoException).code
+
+    if (code === 'ENOENT') {
+      throw new Error(`Required command not found: ${command}`)
+    }
+
+    throw new Error(failureMessage)
+  }
+}
+
 async function exec(
   command: string,
   args: string[],

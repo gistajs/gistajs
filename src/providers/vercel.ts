@@ -2,7 +2,9 @@ import { existsSync } from 'node:fs'
 import { readFile as readFileFs } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { run, runInput, runOutput } from '../utils/subprocess.js'
+import { getRequiredEnvVar } from '../utils/env.js'
+import { assertCommand, run, runInput, runOutput } from '../utils/subprocess.js'
+import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
 
 type ProvisionDeps = {
@@ -39,7 +41,7 @@ export async function provisionVercel(
   }
 
   await assertCommand(
-    deps,
+    deps.run,
     cwd,
     'vercel',
     ['whoami'],
@@ -92,47 +94,4 @@ async function readEnvFile(
 
     throw error
   }
-}
-
-async function assertCommand(
-  deps: Pick<ProvisionDeps, 'run'>,
-  cwd: string,
-  command: string,
-  args: string[],
-  failureMessage: string,
-) {
-  try {
-    await deps.run(command, args, cwd)
-  } catch (error) {
-    let code = (error as NodeJS.ErrnoException).code
-
-    if (code === 'ENOENT') {
-      throw new Error(`Required command not found: ${command}`)
-    }
-
-    throw new Error(failureMessage)
-  }
-}
-
-function getRequiredEnvVar(file: string, key: string) {
-  let value = file.match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1]?.trim()
-
-  if (!value) {
-    throw new Error(
-      `Missing ${key} in .env. Provision Turso and prep the app first.`,
-    )
-  }
-
-  return value
-}
-
-function parseFirstColumn(table: string) {
-  return table
-    .trim()
-    .split('\n')
-    .slice(1)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split(/\s+/)[0])
-    .filter(Boolean)
 }

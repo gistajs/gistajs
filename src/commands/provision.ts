@@ -1,10 +1,10 @@
 import {
   getDefaultSharedRegion,
   getSharedRegion,
-  parseSharedRegion,
   sharedRegions,
 } from '../providers/regions.js'
 import type { CliDeps } from '../utils/deps.js'
+import { readProjectPackage } from '../utils/package.js'
 import type { ProvisionOptions, ProvisionStatus } from '../utils/types.js'
 import { satisfiesVersion } from '../utils/version.js'
 import { UsageError } from './error.js'
@@ -44,7 +44,7 @@ async function runProviderProvision(provider: string, deps: CliDeps) {
     throw new UsageError(`Unknown provider: ${provider}`, 'provision')
   }
 
-  let pkg = await readProjectPackage(deps)
+  let pkg = await readProvisionPackage(deps)
   let region = await resolveProjectRegion(pkg, deps)
   await writeProjectRegion(pkg, region.id, deps)
 
@@ -59,7 +59,7 @@ async function runProviderProvision(provider: string, deps: CliDeps) {
   }
 }
 
-type ProjectPackage = {
+type ProjectPackage = Record<string, unknown> & {
   gistajs?: {
     pin?: string
     providers?: string[]
@@ -72,7 +72,7 @@ type ProjectPackage = {
 type ProvisionSummary = Record<ProvisionStatus, string[]>
 
 async function runProjectProvision(deps: CliDeps) {
-  let pkg = await readProjectPackage(deps)
+  let pkg = await readProvisionPackage(deps)
   let providers = pkg.gistajs?.providers
 
   if (!providers?.length) {
@@ -121,27 +121,8 @@ async function runProjectProvision(deps: CliDeps) {
   printSummary(summary, deps)
 }
 
-async function readProjectPackage(deps: Pick<CliDeps, 'cwd' | 'readFile'>) {
-  let path = `${deps.cwd}/package.json`
-
-  try {
-    let file = await deps.readFile(path, 'utf8')
-    return JSON.parse(file) as ProjectPackage
-  } catch (error) {
-    let code = (error as NodeJS.ErrnoException).code
-
-    if (code === 'ENOENT') {
-      throw new Error(
-        'No package.json found. Run this from a Gista.js project directory.',
-      )
-    }
-
-    if (error instanceof SyntaxError) {
-      throw new Error('Could not parse package.json in the current directory.')
-    }
-
-    throw error
-  }
+async function readProvisionPackage(deps: Pick<CliDeps, 'cwd' | 'readFile'>) {
+  return (await readProjectPackage(deps.cwd, deps.readFile)) as ProjectPackage
 }
 
 async function writeProjectRegion(
@@ -182,7 +163,7 @@ async function resolveProjectRegion(
 
   while (true) {
     let answer = await deps.promptText(`Region (${fallback.label}): `)
-    let selected = parseSharedRegion(answer.trim() || fallback.id)
+    let selected = getSharedRegion(answer.trim() || fallback.id)
 
     if (selected) return selected
 

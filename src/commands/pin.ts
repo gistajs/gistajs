@@ -1,11 +1,10 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CliDeps } from '../utils/deps.js'
+import { readProjectPackage } from '../utils/package.js'
 import { validateStarterReleaseKey } from '../utils/releases.js'
 import type { PinOptions } from '../utils/types.js'
 import { UsageError } from './error.js'
-
-type ProjectPackage = Record<string, unknown>
 
 export type ProjectStarterPin = {
   pin: string
@@ -105,32 +104,4 @@ export async function writeProjectStarterPin(root: string, pin: string) {
   )
 
   return parsed
-}
-
-async function readProjectPackage(root: string): Promise<ProjectPackage> {
-  let path = join(root, 'package.json')
-  let source: string
-
-  try {
-    source = await readFile(path, 'utf8')
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
-      throw new Error(`Could not find package.json in ${root}`)
-    }
-
-    throw error
-  }
-
-  try {
-    let pkg = JSON.parse(source)
-
-    if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) {
-      throw new Error('package.json must contain a JSON object')
-    }
-
-    return pkg as ProjectPackage
-  } catch (error) {
-    let message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Invalid package.json: ${message}`)
-  }
 }

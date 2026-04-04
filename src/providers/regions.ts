@@ -49,11 +49,3 @@ export function getSharedRegion(value: string) {
 export function getDefaultSharedRegion() {
   return getSharedRegion(defaultSharedRegionId)!
 }
-
-export function parseSharedRegion(value: string) {
-  let normalized = value.trim().toLowerCase()
-
-  if (!normalized) return null
-
-  return getSharedRegion(normalized)
-}
