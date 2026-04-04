@@ -218,6 +218,7 @@ describe('provisionVercel', () => {
 
   it('supports Mumbai when the selected Turso region has a Vercel mapping', async () => {
     let deps = makeVercelDeps({
+      runOutput: vi.fn().mockResolvedValue('alice'),
       readFile: vi
         .fn()
         .mockResolvedValue(
@@ -240,10 +241,13 @@ describe('provisionVercel', () => {
       status: 'completed',
     })
 
-    expect(deps.run).toHaveBeenCalledWith(
+    expect(deps.runOutput).toHaveBeenCalledWith(
       'vercel',
-      ['--regions', 'bom1'],
+      ['whoami'],
       '/tmp/demo',
+    )
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'Set your Vercel function region to Mumbai in project settings if you want it to match Turso.',
     )
   })
 
@@ -302,6 +306,25 @@ describe('provisionVercel', () => {
 
     expect(deps.run).toHaveBeenCalledWith('vercel', ['link'], '/tmp/demo')
   })
+
+  it('checks Vercel auth with a quiet whoami probe', async () => {
+    let deps = makeVercelDeps({
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await provisionVercel('/tmp/demo', oregon, deps)
+
+    expect(deps.runOutput).toHaveBeenCalledWith(
+      'vercel',
+      ['whoami'],
+      '/tmp/demo',
+    )
+    expect(deps.run).not.toHaveBeenCalledWith('vercel', ['whoami'], '/tmp/demo')
+  })
 })
 
 function makeDeps(overrides: Record<string, unknown> = {}) {
@@ -324,7 +347,13 @@ function makeVercelDeps(overrides: Record<string, unknown> = {}) {
   return {
     run: vi.fn().mockResolvedValue(undefined),
     runInput: vi.fn().mockResolvedValue(undefined),
-    runOutput: vi.fn().mockResolvedValue('NAME VALUE TARGET\n'),
+    runOutput: vi.fn(async (_command, args) => {
+      if (args.join(' ') === 'whoami') {
+        return 'alice'
+      }
+
+      return 'NAME VALUE TARGET\n'
+    }),
     readFile: vi.fn().mockResolvedValue(''),
     existsSync: vi.fn().mockReturnValue(true),
     stdout: { log: vi.fn() },

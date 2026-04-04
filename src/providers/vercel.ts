@@ -3,7 +3,7 @@ import { readFile as readFileFs } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { getRequiredEnvVar } from '../utils/env.js'
-import { assertCommand, run, runInput, runOutput } from '../utils/subprocess.js'
+import { run, runInput, runOutput } from '../utils/subprocess.js'
 import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
 
@@ -40,21 +40,12 @@ export async function provisionVercel(
     )
   }
 
-  await assertCommand(
-    deps.run,
-    cwd,
-    'vercel',
-    ['whoami'],
-    'Not logged in. Run `vercel login` first.',
-  )
+  await assertLoggedIn(deps, cwd)
 
   if (!deps.existsSync(join(cwd, '.vercel', 'project.json'))) {
     deps.stdout.log('Linking this directory to a Vercel project...')
     await deps.run('vercel', ['link'], cwd)
   }
-
-  deps.stdout.log(`Setting the Vercel function region to ${region.label}...`)
-  await deps.run('vercel', ['--regions', region.vercel], cwd)
 
   let envPath = join(cwd, '.env')
   let file = await readEnvFile(envPath, deps)
@@ -71,6 +62,9 @@ export async function provisionVercel(
     await deps.runInput('vercel', args, cwd, `${value}\n`)
   }
 
+  deps.stdout.log(
+    `Set your Vercel function region to ${region.label} in project settings if you want it to match Turso.`,
+  )
   deps.stdout.log('Saved COOKIE_SECRET, DB_URL, and DB_AUTH_TOKEN to Vercel.')
 
   return {
@@ -93,5 +87,22 @@ async function readEnvFile(
     }
 
     throw error
+  }
+}
+
+async function assertLoggedIn(
+  deps: Pick<ProvisionDeps, 'runOutput'>,
+  cwd: string,
+) {
+  try {
+    await deps.runOutput('vercel', ['whoami'], cwd)
+  } catch (error) {
+    let code = (error as NodeJS.ErrnoException).code
+
+    if (code === 'ENOENT') {
+      throw new Error('Required command not found: vercel')
+    }
+
+    throw new Error('Not logged in. Run `vercel login` first.')
   }
 }
