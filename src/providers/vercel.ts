@@ -62,7 +62,7 @@ export async function provisionVercel(
       ? ['env', 'update', key, 'production', '--yes']
       : ['env', 'add', key, 'production', '--force']
 
-    await deps.runInput('vercel', args, cwd, `${value}\n`)
+    await deps.runInput('vercel', args, cwd, value)
   }
 
   deps.stdout.log('Saved COOKIE_SECRET, DB_URL, and DB_AUTH_TOKEN to Vercel.')

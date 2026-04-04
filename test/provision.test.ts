@@ -298,19 +298,19 @@ describe('provisionVercel', () => {
         'vercel',
         ['env', 'update', 'COOKIE_SECRET', 'production', '--yes'],
         '/tmp/demo',
-        'secret\n',
+        'secret',
       ],
       [
         'vercel',
         ['env', 'add', 'DB_URL', 'production', '--force'],
         '/tmp/demo',
-        'libsql://demo\n',
+        'libsql://demo',
       ],
       [
         'vercel',
         ['env', 'add', 'DB_AUTH_TOKEN', 'production', '--force'],
         '/tmp/demo',
-        'token\n',
+        'token',
       ],
     ])
   })
