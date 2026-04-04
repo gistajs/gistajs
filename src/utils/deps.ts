@@ -55,8 +55,17 @@ async function readDefaultProvisionRegion() {
 
     if (!response.ok) return null
 
-    let region = (await response.text()).trim().toLowerCase()
-    return region || null
+    let body = (await response.text()).trim()
+
+    if (!body) return null
+
+    try {
+      let parsed = JSON.parse(body) as { server?: string }
+      let region = parsed.server?.trim().toLowerCase()
+      return region || null
+    } catch {
+      return body.toLowerCase()
+    }
   } catch {
     return null
   }
