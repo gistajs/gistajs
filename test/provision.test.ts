@@ -34,12 +34,11 @@ describe('provisionTurso', () => {
 
   it('fails clearly when a new region group cannot be created', async () => {
     let deps = makeDeps({
-      run: vi.fn(async (_command, args) => {
-        if (args[0] === 'group' && args[1] === 'create') {
-          throw new Error('boom')
-        }
-      }),
       runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'auth whoami') {
+          return 'alice'
+        }
+
         if (args.join(' ') === 'org list') {
           return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
         }
@@ -54,6 +53,11 @@ describe('provisionTurso', () => {
 
         return ''
       }),
+      run: vi.fn(async (_command, args) => {
+        if (args[0] === 'group' && args[1] === 'create') {
+          throw new Error('boom')
+        }
+      }),
       promptText: vi.fn().mockResolvedValue(''),
     })
 
@@ -65,6 +69,10 @@ describe('provisionTurso', () => {
   it('returns a completed result after writing credentials', async () => {
     let deps = makeDeps({
       runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'auth whoami') {
+          return 'alice'
+        }
+
         if (args.join(' ') === 'org list') {
           return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
         }
@@ -101,6 +109,10 @@ describe('provisionTurso', () => {
   it('creates a new group when no group matches the selected region', async () => {
     let deps = makeDeps({
       runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'auth whoami') {
+          return 'alice'
+        }
+
         if (args.join(' ') === 'org list') {
           return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
         }
@@ -131,6 +143,52 @@ describe('provisionTurso', () => {
     expect(deps.run).toHaveBeenCalledWith(
       'turso',
       ['group', 'create', 'demo-oregon', '--location', 'aws-us-west-2'],
+      '/tmp/demo',
+    )
+  })
+
+  it('checks Turso auth with a quiet whoami probe', async () => {
+    let deps = makeDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'auth whoami') {
+          return 'alice'
+        }
+
+        if (args.join(' ') === 'org list') {
+          return 'NAME SLUG TYPE\nPersonal personal personal (current)\n'
+        }
+
+        if (args.join(' ') === 'db list') {
+          return 'NAME GROUP LOCATIONS\n'
+        }
+
+        if (args.join(' ') === 'group list') {
+          return 'NAME LOCATION\ndefault aws-us-west-2\n'
+        }
+
+        if (args.join(' ') === 'db show demo --url') {
+          return 'libsql://demo.turso.io'
+        }
+
+        if (args.join(' ') === 'db tokens create demo') {
+          return 'secret-token'
+        }
+
+        return ''
+      }),
+      promptText: vi.fn().mockResolvedValue('demo'),
+    })
+
+    await provisionTurso('/tmp/demo', oregon, deps)
+
+    expect(deps.runOutput).toHaveBeenCalledWith(
+      'turso',
+      ['auth', 'whoami'],
+      '/tmp/demo',
+    )
+    expect(deps.run).not.toHaveBeenCalledWith(
+      'turso',
+      ['auth', 'status'],
       '/tmp/demo',
     )
   })

@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { getEnvVar, setEnvVar } from '../utils/env.js'
 import { promptConfirm, promptText } from '../utils/prompt.js'
-import { assertCommand, run, runOutput } from '../utils/subprocess.js'
+import { run, runOutput } from '../utils/subprocess.js'
 import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
 import { getSharedRegion } from './regions.js'
@@ -73,13 +73,7 @@ export async function provisionTurso(
     }
   }
 
-  await assertCommand(
-    deps.run,
-    cwd,
-    'turso',
-    ['auth', 'status'],
-    'Not logged in. Run `turso auth login` first.',
-  )
+  await assertLoggedIn(deps, cwd)
 
   let orgs = parseOrgTable(await deps.runOutput('turso', ['org', 'list'], cwd))
 
@@ -190,6 +184,23 @@ async function ensureEnvFile(
   await deps.writeFile(envPath, '', 'utf8')
   deps.stdout.log('Created empty .env')
   return ''
+}
+
+async function assertLoggedIn(
+  deps: Pick<ProvisionDeps, 'runOutput'>,
+  cwd: string,
+) {
+  try {
+    await deps.runOutput('turso', ['auth', 'whoami'], cwd)
+  } catch (error) {
+    let code = (error as NodeJS.ErrnoException).code
+
+    if (code === 'ENOENT') {
+      throw new Error('Required command not found: turso')
+    }
+
+    throw new Error('Not logged in. Run `turso auth login` first.')
+  }
 }
 
 function parseGroupTable(table: string) {
