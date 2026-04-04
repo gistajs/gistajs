@@ -18,6 +18,7 @@ The CLI entrypoint is `src/bin.ts`, which calls `main()` from `src/cli.ts`. The 
 
 - `src/cli.ts`: command parsing, help/error UX, and create command flow
 - `src/create.ts`: starter download, extraction, package name rewrite, install step
+- `src/providers/*.ts`: provider CLI wrappers for project infrastructure setup
 - `src/catalog.ts`: starter catalog fetch and parsing
 - `src/git.ts`: git initialization and identity handling
 - `src/prompt.ts`: interactive readline prompts

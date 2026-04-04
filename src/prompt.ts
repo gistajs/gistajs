@@ -65,6 +65,15 @@ export async function promptConfirm(message: string, defaultYes = true) {
   }
 }
 
+export async function promptText(message: string) {
+  let rl = createPrompt()
+  try {
+    return await rl.question(c.prompt(message))
+  } finally {
+    rl.close()
+  }
+}
+
 function createPrompt() {
   return readline.createInterface({
     input: process.stdin,

@@ -6,6 +6,7 @@ import {
   parseCreateArgs,
   parseDiffArgs,
   parsePinArgs,
+  parseProvisionArgs,
   runCli,
 } from '../src/cli.js'
 import { parseStarterRelease } from '../src/releases.js'
@@ -81,6 +82,14 @@ describe('parsePinArgs', () => {
   })
 })
 
+describe('parseProvisionArgs', () => {
+  it('parses a provider', () => {
+    expect(parseProvisionArgs(['turso'])).toEqual({
+      provider: 'turso',
+    })
+  })
+})
+
 describe('runCli', () => {
   it('prints help for bare invocation without loading the catalog', async () => {
     let deps = makeCliDeps()
@@ -100,6 +109,15 @@ describe('runCli', () => {
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs diff')
+  })
+
+  it('prints provision help for bare provision invocation', async () => {
+    let deps = makeCliDeps()
+
+    await runCli(['provision'], deps)
+
+    expect(deps.stdout.log).toHaveBeenCalledOnce()
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs provision')
   })
 
   it('dispatches latest diff from the project pin', async () => {
@@ -195,6 +213,25 @@ describe('runCli', () => {
       'auth:2026-03-29-001',
     )
   })
+
+  it('dispatches Turso provisioning from the current directory', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      provisionTurso: vi.fn().mockResolvedValue(undefined),
+    })
+
+    await runCli(['provision', 'turso'], deps)
+
+    expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo')
+  })
+
+  it('rejects unknown provision providers', async () => {
+    let deps = makeCliDeps()
+
+    await expect(runCli(['provision', 'fly'], deps)).rejects.toThrow(
+      'Unknown provider: fly',
+    )
+  })
 })
 
 describe('main', () => {
@@ -230,6 +267,7 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     diffStarter: vi.fn(),
     readProjectStarterPin: vi.fn(),
     writeProjectStarterPin: vi.fn(),
+    provisionTurso: vi.fn(),
     promptForStarter: vi.fn(),
     promptConfirm: vi.fn(),
     stdout: { log: vi.fn() },

@@ -32,3 +32,9 @@ export type DiffOptions = {
 export type PinOptions = {
   releaseKey?: string
 }
+
+export type ProvisionProvider = 'turso' | 'vercel'
+
+export type ProvisionOptions = {
+  provider?: ProvisionProvider | string
+}

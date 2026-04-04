@@ -9,8 +9,8 @@ npx gistajs create my-app
 npx gistajs create my-app --starter website --no-install --no-git
 ```
 
-Today the CLI covers project creation, starter diffs, and pin management.
-Provisioning flows such as Turso or Vercel are intended to live here as first-class commands rather than as ad hoc per-starter scripts.
+Today the CLI covers project creation, starter diffs, pin management, and Turso provisioning.
+Vercel provisioning is the next intended provider in the same command family.
 
 ### Diff
 
@@ -49,6 +49,16 @@ That baseline lives in `package.json` as `gistajs.pin`:
 
 `gistajs diff --latest` uses that pin as the starting point and compares it to the latest published release for the same starter.
 After you accept an upgrade, advance the pin explicitly with `gistajs pin <release-key>`.
+
+### Provision
+
+Provision a Turso database for the current project and write `DB_URL` plus `DB_AUTH_TOKEN` into `.env`:
+
+```bash
+npx gistajs provision turso
+```
+
+The command is interactive. It checks Turso login state, lets you choose an org when needed, prompts for a database name and group, and asks before overwriting existing database credentials in `.env`.
 
 ## Development
 

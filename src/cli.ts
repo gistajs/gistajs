@@ -5,8 +5,14 @@ import { createProject } from './create.js'
 import { diffStarter } from './diff.js'
 import { readProjectStarterPin, writeProjectStarterPin } from './pin.js'
 import { promptConfirm, promptForStarter } from './prompt.js'
+import { provisionTurso } from './providers/turso.js'
 import { loadStarterRelease, validateStarterReleaseKey } from './releases.js'
-import type { CreateOptions, DiffOptions, PinOptions } from './types.js'
+import type {
+  CreateOptions,
+  DiffOptions,
+  PinOptions,
+  ProvisionOptions,
+} from './types.js'
 
 export type CliDeps = {
   loadCatalog: typeof loadCatalog
@@ -15,6 +21,7 @@ export type CliDeps = {
   diffStarter: typeof diffStarter
   readProjectStarterPin: typeof readProjectStarterPin
   writeProjectStarterPin: typeof writeProjectStarterPin
+  provisionTurso: typeof provisionTurso
   promptForStarter: typeof promptForStarter
   promptConfirm: typeof promptConfirm
   stdout: Pick<typeof console, 'log'>
@@ -28,6 +35,7 @@ const defaultDeps: CliDeps = {
   diffStarter,
   readProjectStarterPin,
   writeProjectStarterPin,
+  provisionTurso,
   promptForStarter,
   promptConfirm,
   stdout: console,
@@ -181,6 +189,30 @@ export async function runCli(
     return
   }
 
+  if (command === 'provision') {
+    if (rest.length === 0) {
+      deps.stdout.log(getHelpText('provision'))
+      return
+    }
+
+    let options = parseProvisionArgs(rest)
+
+    if (!options.provider) {
+      throw new UsageError('Provider is required', 'provision')
+    }
+
+    if (options.provider === 'turso') {
+      await deps.provisionTurso(deps.cwd)
+      return
+    }
+
+    if (options.provider === 'vercel') {
+      throw new Error('`gistajs provision vercel` is not implemented yet')
+    }
+
+    throw new UsageError(`Unknown provider: ${options.provider}`, 'provision')
+  }
+
   throw new UsageError(`Unknown command: ${command}`)
 }
 
@@ -310,6 +342,25 @@ export function parsePinArgs(argv: string[]): PinOptions {
   return options
 }
 
+export function parseProvisionArgs(argv: string[]): ProvisionOptions {
+  let options: ProvisionOptions = {}
+
+  for (let index = 0; index < argv.length; index += 1) {
+    let arg = argv[index]
+
+    if (!arg) continue
+
+    if (!arg.startsWith('--') && !options.provider) {
+      options.provider = arg
+      continue
+    }
+
+    throw new UsageError(`Unknown argument: ${arg}`, 'provision')
+  }
+
+  return options
+}
+
 function getHelpText(command?: string) {
   let header = `  ${c.brand('gistajs')} ${c.dim('— scaffold and manage Gista.js starter projects')}`
 
@@ -360,6 +411,24 @@ function getHelpText(command?: string) {
     ].join('\n')
   }
 
+  if (command === 'provision') {
+    return [
+      '',
+      header,
+      '',
+      `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs provision')} <provider>`,
+      '',
+      `  ${c.bold('Providers:')}`,
+      `    turso    Create a Turso database and save credentials to .env`,
+      `    vercel   Reserved for deployment provisioning`,
+      '',
+      `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs provision turso`,
+      '',
+    ].join('\n')
+  }
+
   return [
     '',
     header,
@@ -369,6 +438,7 @@ function getHelpText(command?: string) {
     `    ${c.dim('$')} ${c.bold('gistajs diff')} --latest [--stat]`,
     `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
     `    ${c.dim('$')} ${c.bold('gistajs pin')} <release-key>`,
+    `    ${c.dim('$')} ${c.bold('gistajs provision')} <provider>`,
     '',
     `  ${c.bold('Examples:')}`,
     `    ${c.dim('$')} gistajs create my-app`,
@@ -378,6 +448,7 @@ function getHelpText(command?: string) {
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001`,
     `    ${c.dim('$')} gistajs diff auth 2026-03-28-001 2026-03-29-001 --stat`,
     `    ${c.dim('$')} gistajs pin 2026-04-01-001`,
+    `    ${c.dim('$')} gistajs provision turso`,
     '',
   ].join('\n')
 }
