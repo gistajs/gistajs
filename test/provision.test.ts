@@ -251,6 +251,29 @@ describe('provisionVercel', () => {
     )
   })
 
+  it('can deploy at the end after syncing env vars', async () => {
+    let deps = makeVercelDeps({
+      promptConfirm: vi.fn().mockResolvedValue(true),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await expect(provisionVercel('/tmp/demo', oregon, deps)).resolves.toEqual({
+      provider: 'vercel',
+      status: 'completed',
+    })
+
+    expect(deps.runInput).toHaveBeenCalledTimes(3)
+    expect(deps.run).toHaveBeenCalledWith(
+      'vercel',
+      ['--regions', 'sfo1'],
+      '/tmp/demo',
+    )
+  })
+
   it('updates existing env vars and adds missing ones', async () => {
     let deps = makeVercelDeps({
       readFile: vi
@@ -358,6 +381,7 @@ function makeVercelDeps(overrides: Record<string, unknown> = {}) {
 
       return 'NAME VALUE TARGET\n'
     }),
+    promptConfirm: vi.fn().mockResolvedValue(false),
     readFile: vi.fn().mockResolvedValue(''),
     existsSync: vi.fn().mockReturnValue(true),
     stdout: { log: vi.fn() },

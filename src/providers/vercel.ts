@@ -3,6 +3,7 @@ import { readFile as readFileFs } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { getRequiredEnvVar } from '../utils/env.js'
+import { promptConfirm } from '../utils/prompt.js'
 import { run, runInput, runOutput } from '../utils/subprocess.js'
 import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
@@ -11,6 +12,7 @@ type ProvisionDeps = {
   run: typeof run
   runInput: typeof runInput
   runOutput: typeof runOutput
+  promptConfirm: typeof promptConfirm
   readFile: typeof readFileFs
   existsSync: typeof existsSync
   stdout: Pick<typeof console, 'log'>
@@ -21,6 +23,7 @@ const defaultDeps: ProvisionDeps = {
   run,
   runInput,
   runOutput,
+  promptConfirm,
   readFile: readFileFs,
   existsSync,
   stdout: console,
@@ -62,10 +65,21 @@ export async function provisionVercel(
     await deps.runInput('vercel', args, cwd, `${value}\n`)
   }
 
-  deps.stdout.log(
-    `Set your Vercel function region to ${region.label} in project settings if you want it to match Turso.`,
-  )
   deps.stdout.log('Saved COOKIE_SECRET, DB_URL, and DB_AUTH_TOKEN to Vercel.')
+
+  let shouldDeploy = await deps.promptConfirm(
+    'Deploy to Vercel now? (y/N) ',
+    false,
+  )
+
+  if (shouldDeploy) {
+    deps.stdout.log(`Deploying to Vercel in ${region.label}...`)
+    await deps.run('vercel', ['--regions', region.vercel], cwd)
+  } else {
+    deps.stdout.log(
+      `Set your Vercel function region to ${region.label} in project settings if you want it to match Turso.`,
+    )
+  }
 
   return {
     provider: 'vercel',
