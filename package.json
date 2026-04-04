@@ -1,6 +1,6 @@
 {
   "name": "gistajs",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Scaffold and manage Gista.js starter projects",
   "keywords": [
     "cli",
