@@ -20,6 +20,16 @@ export async function runOutput(
   })
 }
 
+export async function runChecked(
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<string> {
+  return await exec(command, args, cwd, {
+    capture: true,
+  })
+}
+
 export async function runInput(
   command: string,
   args: string[],

@@ -104,6 +104,9 @@ describe('provisionTurso', () => {
     })
 
     expect(deps.writeFile).toHaveBeenCalledOnce()
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'Created Turso database demo in Oregon.',
+    )
   })
 
   it('creates a new group when no group matches the selected region', async () => {
@@ -311,6 +314,7 @@ describe('provisionVercel', () => {
 function makeDeps(overrides: Record<string, unknown> = {}) {
   return {
     run: vi.fn().mockResolvedValue(undefined),
+    runChecked: vi.fn().mockResolvedValue(''),
     runOutput: vi.fn().mockResolvedValue(''),
     promptConfirm: vi.fn().mockResolvedValue(true),
     promptText: vi.fn().mockResolvedValue(''),

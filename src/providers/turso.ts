@@ -3,13 +3,14 @@ import { basename, join } from 'node:path'
 import process from 'node:process'
 import { getEnvVar, setEnvVar } from '../utils/env.js'
 import { promptConfirm, promptText } from '../utils/prompt.js'
-import { run, runOutput } from '../utils/subprocess.js'
+import { run, runChecked, runOutput } from '../utils/subprocess.js'
 import { parseFirstColumn } from '../utils/table.js'
 import type { ProvisionRegion, ProvisionResult } from '../utils/types.js'
 import { getSharedRegion } from './regions.js'
 
 type ProvisionDeps = {
   run: typeof run
+  runChecked: typeof runChecked
   runOutput: typeof runOutput
   promptConfirm: typeof promptConfirm
   promptText: typeof promptText
@@ -22,6 +23,7 @@ type ProvisionDeps = {
 
 const defaultDeps: ProvisionDeps = {
   run,
+  runChecked,
   runOutput,
   promptConfirm,
   promptText,
@@ -141,7 +143,7 @@ export async function provisionTurso(
     }
   }
 
-  await deps.run('turso', ['db', 'create', name, '--group', group], cwd)
+  await deps.runChecked('turso', ['db', 'create', name, '--group', group], cwd)
 
   let url = (
     await deps.runOutput('turso', ['db', 'show', name, '--url'], cwd)
@@ -154,6 +156,7 @@ export async function provisionTurso(
   file = setEnvVar(file, 'DB_AUTH_TOKEN', token)
   await deps.writeFile(envPath, file, 'utf8')
 
+  deps.stdout.log(`Created Turso database ${name} in ${region.label}.`)
   deps.stdout.log('Saved Turso credentials to .env')
 
   return {
