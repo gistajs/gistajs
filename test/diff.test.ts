@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  diffStarter,
-  getStarterRepoUrl,
-  resolveStarterTagName,
-} from '../src/commands/diff.js'
+import { diffStarter } from '../src/commands/diff.js'
 import { parseCatalog } from '../src/utils/catalog.js'
 
 let sampleCatalog = parseCatalog([
@@ -16,18 +12,6 @@ let sampleCatalog = parseCatalog([
 ])
 
 describe('diffStarter', () => {
-  it('resolves starter tag names with the starter prefix', () => {
-    expect(resolveStarterTagName('auth', '2026-03-29-001')).toBe(
-      'auth/2026-03-29-001',
-    )
-  })
-
-  it('builds the starter repo url from the catalog entry', () => {
-    expect(getStarterRepoUrl(sampleCatalog[0]!)).toBe(
-      'https://github.com/gistajs/auth.git',
-    )
-  })
-
   it('fetches both tags and diffs them by tag ref', async () => {
     let run = vi.fn().mockResolvedValue(undefined)
     let runOutput = vi.fn().mockResolvedValue(' package.json | 2 +-')

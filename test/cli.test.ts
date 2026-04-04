@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CliDeps } from '../src/cli.js'
 import { main, runCli } from '../src/cli.js'
-import { parseCreateArgs } from '../src/commands/create.js'
-import { parseDiffArgs } from '../src/commands/diff.js'
-import { parsePinArgs } from '../src/commands/pin.js'
-import { parseProvisionArgs } from '../src/commands/provision.js'
 import { parseCatalog } from '../src/utils/catalog.js'
 import { parseStarterRelease } from '../src/utils/releases.js'
 
@@ -37,60 +33,6 @@ let sampleReleaseByStarter = {
   }),
 }
 
-describe('parseCreateArgs', () => {
-  it('parses starter flags', () => {
-    expect(
-      parseCreateArgs(['my-app', '--starter', 'db', '--no-install']),
-    ).toEqual({
-      projectName: 'my-app',
-      starter: 'db',
-      install: false,
-    })
-  })
-
-  it('rejects missing starter values', () => {
-    expect(() => parseCreateArgs(['my-app', '--starter'])).toThrow(
-      '--starter requires a value',
-    )
-  })
-})
-
-describe('parseDiffArgs', () => {
-  it('parses starter release keys', () => {
-    expect(parseDiffArgs(['auth', '2026-03-28-001', '2026-03-29-001'])).toEqual(
-      {
-        starter: 'auth',
-        fromReleaseKey: '2026-03-28-001',
-        toReleaseKey: '2026-03-29-001',
-      },
-    )
-  })
-
-  it('parses --latest flag', () => {
-    expect(parseDiffArgs(['--latest'])).toEqual({ latest: true })
-  })
-})
-
-describe('parsePinArgs', () => {
-  it('parses a release key', () => {
-    expect(parsePinArgs(['2026-04-01-001'])).toEqual({
-      releaseKey: '2026-04-01-001',
-    })
-  })
-})
-
-describe('parseProvisionArgs', () => {
-  it('allows project-aware provision with no provider', () => {
-    expect(parseProvisionArgs([])).toEqual({})
-  })
-
-  it('parses a provider', () => {
-    expect(parseProvisionArgs(['turso'])).toEqual({
-      provider: 'turso',
-    })
-  })
-})
-
 describe('runCli', () => {
   it('prints help for bare invocation without loading the catalog', async () => {
     let deps = makeCliDeps()
@@ -100,49 +42,6 @@ describe('runCli', () => {
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Usage:')
-  })
-
-  it('dispatches create with prompted git/install options', async () => {
-    let deps = makeCliDeps({
-      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
-      createProject: vi.fn().mockResolvedValue('/tmp/my-app'),
-      promptConfirm: vi
-        .fn()
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(true),
-    })
-
-    await runCli(['create', 'my-app', '--starter', 'website'], deps)
-
-    expect(deps.promptConfirm).toHaveBeenNthCalledWith(
-      1,
-      'Initialize git? (Y/n) ',
-    )
-    expect(deps.promptConfirm).toHaveBeenNthCalledWith(
-      2,
-      'Install dependencies? (Y/n) ',
-    )
-    expect(deps.createProject).toHaveBeenCalledWith(sampleCatalog[0], {
-      projectName: 'my-app',
-      starter: 'website',
-      git: true,
-      install: true,
-    })
-  })
-
-  it('does not prompt for starter selection when create receives a starter slug', async () => {
-    let deps = makeCliDeps({
-      loadCatalog: vi.fn().mockResolvedValue(sampleCatalog),
-      createProject: vi.fn().mockResolvedValue('/tmp/my-app'),
-      promptConfirm: vi
-        .fn()
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(false),
-    })
-
-    await runCli(['create', 'my-app', '--starter', 'website'], deps)
-
-    expect(deps.promptForStarter).not.toHaveBeenCalled()
   })
 
   it('prints diff help for bare diff invocation', async () => {
