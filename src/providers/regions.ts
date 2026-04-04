@@ -1,14 +1,20 @@
-export type SharedRegion = {
-  id: string
-  label: string
-  vercel: string
-}
+import type { ProvisionRegion } from '../utils/types.js'
 
-export const sharedRegions: SharedRegion[] = [
+export const sharedRegions: ProvisionRegion[] = [
   {
-    id: 'aws-us-west-2',
-    label: 'Oregon',
-    vercel: 'sfo1',
+    id: 'aws-ap-northeast-1',
+    label: 'Tokyo',
+    vercel: 'hnd1',
+  },
+  {
+    id: 'aws-ap-south-1',
+    label: 'Mumbai',
+    vercel: 'bom1',
+  },
+  {
+    id: 'aws-eu-west-1',
+    label: 'Ireland',
+    vercel: 'dub1',
   },
   {
     id: 'aws-us-east-1',
@@ -16,26 +22,28 @@ export const sharedRegions: SharedRegion[] = [
     vercel: 'iad1',
   },
   {
-    id: 'aws-eu-central-1',
-    label: 'Frankfurt',
-    vercel: 'fra1',
+    id: 'aws-us-east-2',
+    label: 'Ohio',
+    vercel: 'cle1',
   },
   {
-    id: 'aws-ap-northeast-1',
-    label: 'Tokyo',
-    vercel: 'hnd1',
-  },
-  {
-    id: 'aws-ap-southeast-1',
-    label: 'Singapore',
-    vercel: 'sin1',
+    id: 'aws-us-west-2',
+    label: 'Oregon',
+    vercel: 'sfo1',
   },
 ]
 
 export const defaultSharedRegionId = 'aws-us-west-2'
 
-export function getSharedRegion(id: string) {
-  return sharedRegions.find((region) => region.id === id)
+export function getSharedRegion(value: string) {
+  let normalized = value.trim().toLowerCase()
+
+  if (!normalized) return null
+
+  return (
+    sharedRegions.find((region) => region.id === normalized) ||
+    sharedRegions.find((region) => region.label.toLowerCase() === normalized)
+  )
 }
 
 export function getDefaultSharedRegion() {
@@ -47,8 +55,5 @@ export function parseSharedRegion(value: string) {
 
   if (!normalized) return null
 
-  return (
-    sharedRegions.find((region) => region.id === normalized) ||
-    sharedRegions.find((region) => region.label.toLowerCase() === normalized)
-  )
+  return getSharedRegion(normalized)
 }

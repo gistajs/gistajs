@@ -155,6 +155,37 @@ describe('provisionVercel', () => {
     ).rejects.toThrow('Missing COOKIE_SECRET in .env')
   })
 
+  it('supports Mumbai when the selected Turso region has a Vercel mapping', async () => {
+    let deps = makeVercelDeps({
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await expect(
+      provisionVercel(
+        '/tmp/demo',
+        {
+          id: 'aws-ap-south-1',
+          label: 'Mumbai',
+          vercel: 'bom1',
+        },
+        deps,
+      ),
+    ).resolves.toEqual({
+      provider: 'vercel',
+      status: 'completed',
+    })
+
+    expect(deps.run).toHaveBeenCalledWith(
+      'vercel',
+      ['--regions', 'bom1'],
+      '/tmp/demo',
+    )
+  })
+
   it('updates existing env vars and adds missing ones', async () => {
     let deps = makeVercelDeps({
       readFile: vi
