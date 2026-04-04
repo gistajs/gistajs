@@ -50,6 +50,8 @@ export async function provisionVercel(
     await deps.run('vercel', ['link', '--yes'], cwd)
   }
 
+  await maybeConnectGit(deps, cwd)
+
   let envPath = join(cwd, '.env')
   let file = await readEnvFile(envPath, deps)
   let values = requiredEnvVars.map((key) => [key, getRequiredEnvVar(file, key)])
@@ -119,4 +121,61 @@ async function assertLoggedIn(
 
     throw new Error('Not logged in. Run `vercel login` first.')
   }
+}
+
+async function maybeConnectGit(
+  deps: Pick<ProvisionDeps, 'existsSync' | 'runOutput' | 'stdout'>,
+  cwd: string,
+) {
+  if (!deps.existsSync(join(cwd, '.git'))) return
+
+  let remotes = await readGitRemotes(deps, cwd)
+
+  if (remotes.length === 0) return
+
+  try {
+    await deps.runOutput('vercel', ['git', 'connect', '--yes'], cwd)
+    deps.stdout.log('Connected Vercel project to Git repository.')
+  } catch (error) {
+    let message = error instanceof Error ? error.message : String(error)
+
+    if (canSkipGitConnect(message)) return
+
+    throw new Error(`Could not connect Vercel project to Git. ${message}`)
+  }
+}
+
+async function readGitRemotes(
+  deps: Pick<ProvisionDeps, 'runOutput'>,
+  cwd: string,
+) {
+  try {
+    let output = await deps.runOutput('git', ['remote'], cwd)
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+  } catch (error) {
+    let code = (error as NodeJS.ErrnoException).code
+
+    if (code === 'ENOENT') return []
+
+    return []
+  }
+}
+
+function canSkipGitConnect(message: string) {
+  let normalized = message.toLowerCase()
+
+  return (
+    normalized.includes('already connected') ||
+    normalized.includes('connected git repository') ||
+    normalized.includes('no git remote') ||
+    normalized.includes('no remote') ||
+    normalized.includes('not ready') ||
+    normalized.includes('not found') ||
+    normalized.includes('permission') ||
+    normalized.includes('access') ||
+    normalized.includes('push')
+  )
 }

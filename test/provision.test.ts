@@ -317,7 +317,9 @@ describe('provisionVercel', () => {
 
   it('links the project when .vercel/project.json is missing', async () => {
     let deps = makeVercelDeps({
-      existsSync: vi.fn().mockReturnValue(false),
+      existsSync: vi
+        .fn()
+        .mockImplementation((path: string) => !path.endsWith('project.json')),
       readFile: vi
         .fn()
         .mockResolvedValue(
@@ -331,6 +333,124 @@ describe('provisionVercel', () => {
       'vercel',
       ['link', '--yes'],
       '/tmp/demo',
+    )
+  })
+
+  it('connects the linked Vercel project to Git when a remote exists', async () => {
+    let deps = makeVercelDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'whoami') return 'alice'
+        if (args.join(' ') === 'git connect --yes') return 'connected'
+        if (args.join(' ') === 'remote') return 'origin\n'
+        return 'NAME VALUE TARGET\n'
+      }),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await provisionVercel('/tmp/demo', oregon, deps)
+
+    expect(deps.runOutput).toHaveBeenCalledWith(
+      'vercel',
+      ['git', 'connect', '--yes'],
+      '/tmp/demo',
+    )
+    expect(deps.stdout.log).toHaveBeenCalledWith(
+      'Connected Vercel project to Git repository.',
+    )
+  })
+
+  it('skips Git connect when no remote exists', async () => {
+    let deps = makeVercelDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'whoami') return 'alice'
+        if (args.join(' ') === 'remote') return ''
+        return 'NAME VALUE TARGET\n'
+      }),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await provisionVercel('/tmp/demo', oregon, deps)
+
+    expect(deps.runOutput).not.toHaveBeenCalledWith(
+      'vercel',
+      ['git', 'connect', '--yes'],
+      '/tmp/demo',
+    )
+  })
+
+  it('continues when Git is already connected', async () => {
+    let deps = makeVercelDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'whoami') return 'alice'
+        if (args.join(' ') === 'remote') return 'origin\n'
+        if (args.join(' ') === 'git connect --yes') {
+          throw new Error('Project already connected to a Git repository.')
+        }
+        return 'NAME VALUE TARGET\n'
+      }),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await expect(provisionVercel('/tmp/demo', oregon, deps)).resolves.toEqual({
+      provider: 'vercel',
+      status: 'completed',
+    })
+  })
+
+  it('continues when Git connect is not ready yet', async () => {
+    let deps = makeVercelDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'whoami') return 'alice'
+        if (args.join(' ') === 'remote') return 'origin\n'
+        if (args.join(' ') === 'git connect --yes') {
+          throw new Error('Remote repository not found. Push first.')
+        }
+        return 'NAME VALUE TARGET\n'
+      }),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await expect(provisionVercel('/tmp/demo', oregon, deps)).resolves.toEqual({
+      provider: 'vercel',
+      status: 'completed',
+    })
+  })
+
+  it('fails clearly on unexpected Git connect errors', async () => {
+    let deps = makeVercelDeps({
+      runOutput: vi.fn(async (_command, args) => {
+        if (args.join(' ') === 'whoami') return 'alice'
+        if (args.join(' ') === 'remote') return 'origin\n'
+        if (args.join(' ') === 'git connect --yes') {
+          throw new Error('Something exploded')
+        }
+        return 'NAME VALUE TARGET\n'
+      }),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          'COOKIE_SECRET=secret\nDB_URL=libsql://demo\nDB_AUTH_TOKEN=token\n',
+        ),
+    })
+
+    await expect(provisionVercel('/tmp/demo', oregon, deps)).rejects.toThrow(
+      'Could not connect Vercel project to Git. Something exploded',
     )
   })
 
@@ -376,6 +496,10 @@ function makeVercelDeps(overrides: Record<string, unknown> = {}) {
     runOutput: vi.fn(async (_command, args) => {
       if (args.join(' ') === 'whoami') {
         return 'alice'
+      }
+
+      if (_command === 'git' && args.join(' ') === 'remote') {
+        return ''
       }
 
       return 'NAME VALUE TARGET\n'
