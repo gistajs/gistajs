@@ -1,5 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { CliDeps } from '../utils/deps.js'
+import { validateStarterReleaseKey } from '../utils/releases.js'
+import type { PinOptions } from '../utils/types.js'
+import { UsageError } from './error.js'
 
 type ProjectPackage = Record<string, unknown>
 
@@ -7,6 +11,41 @@ export type ProjectStarterPin = {
   pin: string
   starter: string
   releaseKey: string
+}
+
+export function parsePinArgs(argv: string[]): PinOptions {
+  let options: PinOptions = {}
+
+  for (let index = 0; index < argv.length; index += 1) {
+    let arg = argv[index]
+
+    if (!arg) continue
+
+    if (!arg.startsWith('--') && !options.releaseKey) {
+      options.releaseKey = arg
+      continue
+    }
+
+    throw new UsageError(`Unknown argument: ${arg}`, 'pin')
+  }
+
+  return options
+}
+
+export async function runPinCommand(argv: string[], deps: CliDeps) {
+  let options = parsePinArgs(argv)
+
+  if (!options.releaseKey) {
+    throw new UsageError('Release key is required', 'pin')
+  }
+
+  let projectPin = await deps.readProjectStarterPin(deps.cwd)
+  let release = await deps.loadStarterRelease(projectPin.starter)
+  validateStarterReleaseKey(release, options.releaseKey)
+
+  let nextPin = `${projectPin.starter}:${options.releaseKey}`
+  let written = await deps.writeProjectStarterPin(deps.cwd, nextPin)
+  deps.stdout.log(`Pinned ${written.starter} to ${written.releaseKey}`)
 }
 
 export function splitProjectStarterPin(pin: string): ProjectStarterPin {

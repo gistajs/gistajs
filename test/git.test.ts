@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseCatalog } from '../src/catalog.js'
+import { parseCatalog } from '../src/utils/catalog.js'
 
 let sampleCatalog = parseCatalog([
   {
@@ -18,7 +18,7 @@ describe('git identity prompts', () => {
       saveGlobal: false,
     })
 
-    let git = await import('../src/git.js')
+    let git = await import('../src/utils/git.js')
     await git.initGit('/tmp/example', sampleCatalog[0]!, {
       promptForGitIdentity,
       readGitConfig: () => '',

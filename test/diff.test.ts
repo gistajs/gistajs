@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseCatalog } from '../src/catalog.js'
 import {
   diffStarter,
   getStarterRepoUrl,
   resolveStarterTagName,
-} from '../src/diff.js'
+} from '../src/commands/diff.js'
+import { parseCatalog } from '../src/utils/catalog.js'
 
 let sampleCatalog = parseCatalog([
   {

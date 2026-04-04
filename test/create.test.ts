@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as tar from 'tar'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { parseCatalog } from '../src/catalog.js'
-import { createProject, getStarterTarballUrl } from '../src/create.js'
+import { createProject, getStarterTarballUrl } from '../src/commands/create.js'
+import { parseCatalog } from '../src/utils/catalog.js'
 
 let tempRoots: string[] = []
 let sampleCatalog = parseCatalog([

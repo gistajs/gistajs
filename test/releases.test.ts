@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseStarterRelease,
   validateStarterReleaseKey,
-} from '../src/releases.js'
+} from '../src/utils/releases.js'
 
 let sampleRelease = parseStarterRelease({
   slug: 'auth',

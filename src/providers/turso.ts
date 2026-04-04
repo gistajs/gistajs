@@ -1,8 +1,8 @@
 import { cp, readFile, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import process from 'node:process'
-import { promptConfirm, promptText } from '../prompt.js'
-import { run, runOutput } from '../subprocess.js'
+import { promptConfirm, promptText } from '../utils/prompt.js'
+import { run, runOutput } from '../utils/subprocess.js'
 
 type ProvisionDeps = {
   run: typeof run
@@ -33,7 +33,9 @@ export async function provisionTurso(
   deps: ProvisionDeps = defaultDeps,
 ) {
   if (!deps.isTTY) {
-    throw new Error('`gistajs provision turso` requires an interactive terminal')
+    throw new Error(
+      '`gistajs provision turso` requires an interactive terminal',
+    )
   }
 
   let envPath = join(cwd, '.env')
@@ -81,7 +83,9 @@ export async function provisionTurso(
     let currentOrg = orgs.find((org) => org.current)
     let slugs = orgs.map((org) => org.slug)
     deps.stdout.log(`\nAvailable orgs: ${slugs.join(', ')}`)
-    let answer = await deps.promptText(`Org (${currentOrg?.slug ?? slugs[0]}): `)
+    let answer = await deps.promptText(
+      `Org (${currentOrg?.slug ?? slugs[0]}): `,
+    )
     let chosen = answer.trim() || currentOrg?.slug || slugs[0]
 
     if (!slugs.includes(chosen)) {

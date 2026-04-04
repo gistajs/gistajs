@@ -6,7 +6,7 @@ import {
   readProjectStarterPin,
   splitProjectStarterPin,
   writeProjectStarterPin,
-} from '../src/pin.js'
+} from '../src/commands/pin.js'
 
 let tempRoots: string[] = []
 

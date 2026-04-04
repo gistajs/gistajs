@@ -16,12 +16,10 @@ The CLI entrypoint is `src/bin.ts`, which calls `main()` from `src/cli.ts`. The 
 
 ## Repository layout
 
-- `src/cli.ts`: command parsing, help/error UX, and create command flow
-- `src/create.ts`: starter download, extraction, package name rewrite, install step
+- `src/cli.ts`: top-level command routing, help/error UX, and CLI entry control flow
+- `src/commands/*.ts`: per-command argument parsing, orchestration, and command-specific helpers
 - `src/providers/*.ts`: provider CLI wrappers for project infrastructure setup
-- `src/catalog.ts`: starter catalog fetch and parsing
-- `src/git.ts`: git initialization and identity handling
-- `src/prompt.ts`: interactive readline prompts
+- `src/utils/*.ts`: shared support code such as catalog loading, prompts, release helpers, subprocess helpers, colors, types, and CLI dependency wiring
 - `src/index.ts`: public library exports
 - `src/bin.ts`: executable entrypoint
 - `test/*.test.ts`: CLI, scaffold, and provisioning behavior tests

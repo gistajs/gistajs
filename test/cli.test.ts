@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseCatalog } from '../src/catalog.js'
 import type { CliDeps } from '../src/cli.js'
-import {
-  main,
-  parseCreateArgs,
-  parseDiffArgs,
-  parsePinArgs,
-  parseProvisionArgs,
-  runCli,
-} from '../src/cli.js'
-import { parseStarterRelease } from '../src/releases.js'
+import { main, runCli } from '../src/cli.js'
+import { parseCreateArgs } from '../src/commands/create.js'
+import { parseDiffArgs } from '../src/commands/diff.js'
+import { parsePinArgs } from '../src/commands/pin.js'
+import { parseProvisionArgs } from '../src/commands/provision.js'
+import { parseCatalog } from '../src/utils/catalog.js'
+import { parseStarterRelease } from '../src/utils/releases.js'
 
 let sampleCatalog = parseCatalog([
   {
