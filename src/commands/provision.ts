@@ -75,6 +75,7 @@ type ProvisionSummary = Record<ProvisionStatus, string[]>
 type ProjectProvisionDeps = Pick<
   CliDeps,
   | 'cwd'
+  | 'assertCommandAvailable'
   | 'getCliVersion'
   | 'getDefaultProvisionRegion'
   | 'promptConfirm'
@@ -108,6 +109,7 @@ async function runProjectProvision(deps: ProjectProvisionDeps) {
 
   let cliVersion = await deps.getCliVersion()
   assertCliVersion(cliVersion, requirement)
+  await assertProviderCommands(providers, deps)
   let region = await resolveProjectRegion(pkg, deps)
   await writeProjectRegion(pkg, region.id, deps)
 
@@ -146,6 +148,20 @@ async function runProjectProvision(deps: ProjectProvisionDeps) {
   }
 
   printSummary(summary, deps)
+}
+
+async function assertProviderCommands(
+  providers: string[],
+  deps: Pick<CliDeps, 'assertCommandAvailable' | 'cwd'>,
+) {
+  let commands = providers.filter(
+    (provider): provider is 'turso' | 'vercel' =>
+      provider === 'turso' || provider === 'vercel',
+  )
+
+  for (let command of new Set(commands)) {
+    await deps.assertCommandAvailable(deps.cwd, command)
+  }
 }
 
 async function readProvisionPackage(deps: Pick<CliDeps, 'cwd' | 'readFile'>) {

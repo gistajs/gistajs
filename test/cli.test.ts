@@ -233,6 +233,33 @@ describe('runCli', () => {
     )
   })
 
+  it('checks required provider CLIs before prompting for project-aware provision', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi
+        .fn()
+        .mockResolvedValue(
+          makeProjectPackage({ providers: ['turso', 'vercel'] }),
+        ),
+      assertCommandAvailable: vi.fn(async (_cwd, command) => {
+        if (command === 'turso') {
+          throw new Error(
+            'Required command not found: turso. Install: https://docs.turso.tech/cli/installation',
+          )
+        }
+      }),
+      promptText: vi.fn().mockResolvedValue(''),
+    })
+
+    await expect(runCli(['provision'], deps)).rejects.toThrow(
+      'Required command not found: turso. Install: https://docs.turso.tech/cli/installation',
+    )
+
+    expect(deps.promptText).not.toHaveBeenCalled()
+    expect(deps.provisionTurso).not.toHaveBeenCalled()
+    expect(deps.provisionVercel).not.toHaveBeenCalled()
+  })
+
   it('can skip prep:prod and continue to Vercel', async () => {
     let steps: string[] = []
     let deps = makeCliDeps({
@@ -481,6 +508,7 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     getCliVersion: vi.fn().mockResolvedValue('0.1.3'),
     getDefaultProvisionRegion: vi.fn().mockResolvedValue(null),
     runProjectCommand: vi.fn().mockResolvedValue(undefined),
+    assertCommandAvailable: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
 }

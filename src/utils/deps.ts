@@ -11,7 +11,7 @@ import { provisionVercel } from '../providers/vercel.js'
 import { loadCatalog } from './catalog.js'
 import { promptConfirm, promptForStarter, promptText } from './prompt.js'
 import { loadStarterRelease } from './releases.js'
-import { run } from './subprocess.js'
+import { assertCommand, run } from './subprocess.js'
 
 declare const __GISTAJS_VERSION__: string
 
@@ -41,6 +41,7 @@ export type CliDeps = {
   getCliVersion: () => Promise<string>
   getDefaultProvisionRegion: () => Promise<string | null>
   runProjectCommand: (cwd: string, script: string) => Promise<void>
+  assertCommandAvailable: (cwd: string, command: string) => Promise<void>
 }
 
 async function readCliVersion() {
@@ -53,6 +54,28 @@ async function readCliVersion() {
 
 async function runProjectCommand(cwd: string, script: string) {
   await run('pnpm', [script], cwd)
+}
+
+async function assertCommandAvailable(cwd: string, command: string) {
+  let installHint = installHints[command]
+
+  await assertCommand(
+    run,
+    cwd,
+    command,
+    ['--help'],
+    installHint
+      ? `Required command not found: ${command}. ${installHint}`
+      : `Required command not found: ${command}`,
+  )
+}
+
+const installHints: Record<string, string> = {
+  atlas:
+    'Install: https://atlasgo.io/guides/evaluation/install. If you have mise installed: `mise use -g atlas`',
+  turso: 'Install: https://docs.turso.tech/cli/installation',
+  vercel:
+    'Install: https://vercel.com/docs/cli. If you have mise installed: `mise use -g npm:vercel`',
 }
 
 async function readDefaultProvisionRegion() {
@@ -96,4 +119,5 @@ export const defaultDeps: CliDeps = {
   getCliVersion: readCliVersion,
   getDefaultProvisionRegion: readDefaultProvisionRegion,
   runProjectCommand,
+  assertCommandAvailable,
 }
