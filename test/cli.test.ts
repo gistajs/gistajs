@@ -215,6 +215,9 @@ describe('runCli', () => {
           makeProjectPackage({ providers: ['turso', 'vercel'] }),
         ),
       promptText: vi.fn().mockResolvedValue(''),
+      getDefaultProvisionRegion: vi
+        .fn()
+        .mockResolvedValue('aws-ap-northeast-1'),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
         status: 'completed',
@@ -224,9 +227,9 @@ describe('runCli', () => {
     await runCli(['provision', 'turso'], deps)
 
     expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo', {
-      id: 'aws-us-west-2',
-      label: 'Oregon',
-      vercel: 'sfo1',
+      id: 'aws-ap-northeast-1',
+      label: 'Tokyo',
+      vercel: 'hnd1',
     })
   })
 
@@ -239,6 +242,9 @@ describe('runCli', () => {
           makeProjectPackage({ providers: ['turso', 'vercel'] }),
         ),
       promptText: vi.fn().mockResolvedValue(''),
+      getDefaultProvisionRegion: vi
+        .fn()
+        .mockResolvedValue('aws-ap-northeast-1'),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
         status: 'completed',
@@ -252,14 +258,14 @@ describe('runCli', () => {
     await runCli(['provision'], deps)
 
     expect(deps.provisionTurso).toHaveBeenCalledWith('/tmp/demo', {
-      id: 'aws-us-west-2',
-      label: 'Oregon',
-      vercel: 'sfo1',
+      id: 'aws-ap-northeast-1',
+      label: 'Tokyo',
+      vercel: 'hnd1',
     })
     expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
-      id: 'aws-us-west-2',
-      label: 'Oregon',
-      vercel: 'sfo1',
+      id: 'aws-ap-northeast-1',
+      label: 'Tokyo',
+      vercel: 'hnd1',
     })
     expect(deps.stdout.log).toHaveBeenCalledWith('Provision summary')
     expect(deps.stdout.log).toHaveBeenCalledWith('completed: turso, vercel')
@@ -329,6 +335,27 @@ describe('runCli', () => {
       id: 'aws-ap-northeast-1',
       label: 'Tokyo',
       vercel: 'hnd1',
+    })
+  })
+
+  it('falls back to Oregon when the nearest-region lookup is unavailable', async () => {
+    let deps = makeCliDeps({
+      cwd: '/tmp/demo',
+      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
+      promptText: vi.fn().mockResolvedValue(''),
+      getDefaultProvisionRegion: vi.fn().mockResolvedValue(null),
+      provisionVercel: vi.fn().mockResolvedValue({
+        provider: 'vercel',
+        status: 'completed',
+      }),
+    })
+
+    await runCli(['provision', 'vercel'], deps)
+
+    expect(deps.provisionVercel).toHaveBeenCalledWith('/tmp/demo', {
+      id: 'aws-us-west-2',
+      label: 'Oregon',
+      vercel: 'sfo1',
     })
   })
 
@@ -421,6 +448,7 @@ function makeCliDeps(overrides: Partial<CliDeps> = {}) {
     stdout: { log: vi.fn() },
     cwd: process.cwd(),
     getCliVersion: vi.fn().mockResolvedValue('0.1.3'),
+    getDefaultProvisionRegion: vi.fn().mockResolvedValue(null),
     ...overrides,
   } as CliDeps & { stdout: { log: ReturnType<typeof vi.fn> } }
 }

@@ -38,6 +38,7 @@ export type CliDeps = {
   stdout: Pick<typeof console, 'log'>
   cwd: string
   getCliVersion: () => Promise<string>
+  getDefaultProvisionRegion: () => Promise<string | null>
 }
 
 async function readCliVersion() {
@@ -46,6 +47,19 @@ async function readCliVersion() {
   }
 
   return __GISTAJS_VERSION__
+}
+
+async function readDefaultProvisionRegion() {
+  try {
+    let response = await fetch('https://region.turso.io')
+
+    if (!response.ok) return null
+
+    let region = (await response.text()).trim().toLowerCase()
+    return region || null
+  } catch {
+    return null
+  }
 }
 
 export const defaultDeps: CliDeps = {
@@ -65,4 +79,5 @@ export const defaultDeps: CliDeps = {
   stdout: console,
   cwd: process.cwd(),
   getCliVersion: readCliVersion,
+  getDefaultProvisionRegion: readDefaultProvisionRegion,
 }

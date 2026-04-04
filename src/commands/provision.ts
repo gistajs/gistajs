@@ -166,10 +166,10 @@ async function writeProjectRegion(
 
 async function resolveProjectRegion(
   pkg: ProjectPackage,
-  deps: Pick<CliDeps, 'promptText' | 'stdout'>,
+  deps: Pick<CliDeps, 'getDefaultProvisionRegion' | 'promptText' | 'stdout'>,
 ) {
   let current = pkg.gistajs?.region ? getSharedRegion(pkg.gistajs.region) : null
-  let fallback = current || getDefaultSharedRegion()
+  let fallback = current || (await getPromptDefaultRegion(deps))
   let labels = sharedRegions.map((region) => region.label).join(', ')
 
   deps.stdout.log(`Available regions: ${labels}`)
@@ -188,6 +188,19 @@ async function resolveProjectRegion(
 
     deps.stdout.log(`Invalid region. Choose from: ${labels}`)
   }
+}
+
+async function getPromptDefaultRegion(
+  deps: Pick<CliDeps, 'getDefaultProvisionRegion'>,
+) {
+  let nearest = await deps.getDefaultProvisionRegion()
+
+  if (nearest) {
+    let region = getSharedRegion(nearest)
+    if (region) return region
+  }
+
+  return getDefaultSharedRegion()
 }
 
 function printSummary(
