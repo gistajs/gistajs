@@ -1,9 +1,5 @@
 import type { CliDeps } from '../utils/deps.js'
-import type {
-  ProvisionOptions,
-  ProvisionResult,
-  ProvisionStatus,
-} from '../utils/types.js'
+import type { ProvisionOptions, ProvisionStatus } from '../utils/types.js'
 import { satisfiesVersion } from '../utils/version.js'
 import { UsageError } from './error.js'
 
@@ -59,11 +55,7 @@ type ProjectPackage = {
   devDependencies?: Record<string, string>
 }
 
-type ProvisionSummary = {
-  completed: string[]
-  skipped: string[]
-  pending: string[]
-}
+type ProvisionSummary = Record<ProvisionStatus, string[]>
 
 async function runProjectProvision(deps: CliDeps) {
   let pkg = await readProjectPackage(deps)
@@ -75,7 +67,8 @@ async function runProjectProvision(deps: CliDeps) {
     )
   }
 
-  let requirement = getProjectCliRequirement(pkg)
+  let requirement =
+    pkg.devDependencies?.gistajs || pkg.dependencies?.gistajs || ''
 
   if (!requirement) {
     throw new Error(
@@ -95,7 +88,7 @@ async function runProjectProvision(deps: CliDeps) {
   for (let provider of providers) {
     if (provider === 'turso') {
       let result = await deps.provisionTurso(deps.cwd)
-      recordResult(summary, result)
+      summary[result.status].push(result.provider)
       continue
     }
 
@@ -135,24 +128,6 @@ async function readProjectPackage(deps: Pick<CliDeps, 'cwd' | 'readFile'>) {
 
     throw error
   }
-}
-
-function getProjectCliRequirement(pkg: ProjectPackage) {
-  return pkg.devDependencies?.gistajs || pkg.dependencies?.gistajs || ''
-}
-
-function recordResult(summary: ProvisionSummary, result: ProvisionResult) {
-  if (result.status === 'completed') {
-    summary.completed.push(result.provider)
-    return
-  }
-
-  if (result.status === 'skipped') {
-    summary.skipped.push(result.provider)
-    return
-  }
-
-  summary.pending.push(result.provider)
 }
 
 function printSummary(

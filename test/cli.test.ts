@@ -223,17 +223,7 @@ describe('runCli', () => {
   it('dispatches project-aware provision from package metadata', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
-      readFile: vi.fn().mockResolvedValue(
-        JSON.stringify({
-          gistajs: {
-            pin: 'form:2026-04-01-001',
-            providers: ['turso'],
-          },
-          devDependencies: {
-            gistajs: '^0.1.3',
-          },
-        }),
-      ),
+      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
       provisionTurso: vi.fn().mockResolvedValue({
         provider: 'turso',
         status: 'completed',
@@ -259,17 +249,7 @@ describe('runCli', () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
       getCliVersion: vi.fn().mockResolvedValue('0.1.2'),
-      readFile: vi.fn().mockResolvedValue(
-        JSON.stringify({
-          gistajs: {
-            pin: 'form:2026-04-01-001',
-            providers: ['turso'],
-          },
-          devDependencies: {
-            gistajs: '^0.1.3',
-          },
-        }),
-      ),
+      readFile: vi.fn().mockResolvedValue(makeProjectPackage()),
     })
 
     await expect(runCli(['provision'], deps)).rejects.toThrow(
@@ -280,17 +260,9 @@ describe('runCli', () => {
   it('reports pending providers declared by the starter', async () => {
     let deps = makeCliDeps({
       cwd: '/tmp/demo',
-      readFile: vi.fn().mockResolvedValue(
-        JSON.stringify({
-          gistajs: {
-            pin: 'form:2026-04-01-001',
-            providers: ['vercel'],
-          },
-          devDependencies: {
-            gistajs: '^0.1.3',
-          },
-        }),
-      ),
+      readFile: vi
+        .fn()
+        .mockResolvedValue(makeProjectPackage({ providers: ['vercel'] })),
     })
 
     await runCli(['provision'], deps)
@@ -352,6 +324,20 @@ describe('main', () => {
     process.exitCode = previousExitCode
   })
 })
+
+function makeProjectPackage(
+  overrides: { providers?: string[]; requirement?: string } = {},
+) {
+  return JSON.stringify({
+    gistajs: {
+      pin: 'form:2026-04-01-001',
+      providers: overrides.providers ?? ['turso'],
+    },
+    devDependencies: {
+      gistajs: overrides.requirement ?? '^0.1.3',
+    },
+  })
+}
 
 function makeCliDeps(overrides: Partial<CliDeps> = {}) {
   return {
