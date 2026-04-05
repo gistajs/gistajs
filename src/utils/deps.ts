@@ -73,7 +73,8 @@ async function assertCommandAvailable(cwd: string, command: string) {
 const installHints: Record<string, string> = {
   atlas:
     'Install: https://atlasgo.io/guides/evaluation/install. If you have mise installed: `mise use -g atlas`',
-  turso: 'Install: https://docs.turso.tech/cli/installation',
+  turso:
+    'Install: https://docs.turso.tech/cli/installation. If you have mise installed: `mise use -g turso`',
   vercel:
     'Install: https://vercel.com/docs/cli. If you have mise installed: `mise use -g npm:vercel`',
 }
