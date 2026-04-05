@@ -108,7 +108,7 @@ export async function runCreateCommand(argv: string[], deps: CliDeps) {
 
   let root = await deps.createProject(starter, options)
   deps.stdout.log(
-    `\n  ${c.brand('gistajs')} ${c.success('Created')} ${c.slug(starter.slug)} project in ${c.path(root)}\n`,
+    `\n  ${c.brand('gistajs')} created ${c.slug(starter.slug)} project in ${c.path(root)}\n`,
   )
 }
 
