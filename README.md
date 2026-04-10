@@ -17,7 +17,7 @@ For starters that define `pnpm prep`, `gistajs create` offers to run that setup 
 Plan a local add-on install against the current project:
 
 ```bash
-npx gistajs add ./addons/storage --plan
+npx gistajs add ./addons/storage
 ```
 
 `gistajs add` is planning-only right now. It prints the files that would be created or blocked, plus any manual touchpoints the host project needs to wire.

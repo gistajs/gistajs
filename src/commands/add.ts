@@ -1,26 +1,20 @@
 import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { CliDeps } from '../utils/deps.js'
 import { loadInternalAddonManifest } from '../internal/addons/manifest.js'
 import {
   planInternalAddonInstall,
   renderInternalAddonInstallPlan,
 } from '../internal/addons/plan.js'
+import type { CliDeps } from '../utils/deps.js'
 import { UsageError } from './error.js'
 
 export function parseAddArgs(argv: string[]) {
   let source: string | undefined
-  let plan = false
 
   for (let index = 0; index < argv.length; index += 1) {
     let arg = argv[index]
 
     if (!arg) continue
-
-    if (arg === '--plan') {
-      plan = true
-      continue
-    }
 
     if (!arg.startsWith('--') && !source) {
       source = arg
@@ -34,14 +28,7 @@ export function parseAddArgs(argv: string[]) {
     throw new UsageError('Add-on source is required', 'add')
   }
 
-  if (!plan) {
-    throw new UsageError(
-      '`gistajs add` is planning-only right now. Re-run with --plan.',
-      'add',
-    )
-  }
-
-  return { source, plan }
+  return { source }
 }
 
 export async function runAddCommand(argv: string[], deps: CliDeps) {

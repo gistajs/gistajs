@@ -64,7 +64,6 @@ describe('runCli', () => {
 
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs add')
-    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('--plan')
   })
 
   it('renders an add-on plan from a local manifest directory', async () => {
@@ -118,7 +117,7 @@ describe('runCli', () => {
         cwd: projectRoot,
       })
 
-      await runCli(['add', addonRoot, '--plan'], deps)
+      await runCli(['add', addonRoot], deps)
 
       expect(deps.stdout.log).toHaveBeenCalledOnce()
       expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
@@ -134,11 +133,11 @@ describe('runCli', () => {
     }
   })
 
-  it('requires --plan for add right now', async () => {
+  it('fails clearly when add is missing a source', async () => {
     let deps = makeCliDeps()
 
-    await expect(runCli(['add', './storage-addon'], deps)).rejects.toThrow(
-      '`gistajs add` is planning-only right now. Re-run with --plan.',
+    await expect(runCli(['add', '--unknown'], deps)).rejects.toThrow(
+      'Unknown argument: --unknown',
     )
   })
 
