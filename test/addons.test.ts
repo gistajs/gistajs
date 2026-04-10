@@ -187,6 +187,7 @@ describe('planInternalAddonInstall', () => {
     let plan = await planInternalAddonInstall(join(root, 'project'), spec)
 
     expect(plan.blocked).toBe(true)
+    expect(plan.addonRoot).toBe(join(root, 'addon'))
     expect(plan.files).toEqual([
       {
         source: join(root, 'addon/app/config/env.ts'),
@@ -245,12 +246,13 @@ describe('planInternalAddonInstall', () => {
       effect: 'noop',
       status: 'ready',
     })
-    expect(output).toContain(
-      'Internal add-on plan: Storage (storage@2026-04-07-001)',
-    )
-    expect(output).toContain('noop')
+    expect(output).toContain('Add-on plan')
+    expect(output).toContain('Storage')
+    expect(output).toContain('storage@2026-04-07-001')
+    expect(output).toContain('already matches')
     expect(output).toContain('Manual touchpoints')
-    expect(output).toContain('Summary: 0 create, 0 change, 1 noop, 1 manual')
+    expect(output).toContain('Summary')
+    expect(output).toContain('0 create, 0 change, 1 noop, 1 manual')
   })
 
   it('fails before any project writes when a source file is missing', async () => {

@@ -44,6 +44,7 @@ export type InternalAddonInstallPlan = {
     'id' | 'slug' | 'name' | 'description' | 'release'
   >
   projectRoot: string
+  addonRoot: string
   files: InternalAddonPlanFile[]
   touchpoints: InternalAddonTouchpoint[]
   dependencies: Record<string, string>

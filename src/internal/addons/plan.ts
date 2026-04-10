@@ -1,5 +1,6 @@
 import { readFile, stat } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
+import { c } from '../../utils/color.js'
 import type {
   InternalAddonInstallPlan,
   InternalAddonPlanFile,
@@ -15,6 +16,9 @@ const defaultDeps: PlanDeps = {
   readFile,
   stat,
 }
+
+const LABEL_WIDTH = 8
+const DETAIL_PREFIX = ' '.repeat(LABEL_WIDTH + 1)
 
 export async function planInternalAddonInstall(
   projectRoot: string,
@@ -54,6 +58,7 @@ export async function planInternalAddonInstall(
       release: spec.manifest.release,
     },
     projectRoot: root,
+    addonRoot: spec.root,
     files,
     touchpoints: spec.manifest.touchpoints,
     dependencies: spec.manifest.dependencies,
@@ -64,44 +69,50 @@ export async function planInternalAddonInstall(
 
 export function renderInternalAddonInstallPlan(plan: InternalAddonInstallPlan) {
   let lines = [
-    `Internal add-on plan: ${plan.addon.name} (${plan.addon.slug}@${plan.addon.release})`,
+    `${c.bold('Add-on plan')} ${c.bold(plan.addon.name)} ${c.dim(`(${plan.addon.slug}@${plan.addon.release})`)}`,
     '',
   ]
 
   for (let file of plan.files) {
-    let label = `${file.status === 'blocked' ? 'block' : file.effect}`.padEnd(6)
+    let label = formatFileLabel(file)
     let target = relative(plan.projectRoot, file.target) || '.'
-    let detail =
-      file.effect === 'noop' ? 'already matches' : `from ${file.source}`
+    let source = relative(plan.addonRoot, file.source) || '.'
 
-    lines.push(`${label} ${target} ${detail}`)
+    lines.push(`${label} ${c.path(target)}`)
+
+    if (file.effect === 'noop') {
+      lines.push(`${DETAIL_PREFIX}${c.dim('already matches')}`)
+    } else if (source !== target) {
+      lines.push(`${DETAIL_PREFIX}${c.dim('from')} ${c.dim(source)}`)
+    }
 
     if (file.reason) {
-      lines.push(`       ${file.reason}`)
+      lines.push(`${DETAIL_PREFIX}${c.error(file.reason)}`)
     }
   }
 
   if (plan.touchpoints.length > 0) {
-    lines.push('', 'Manual touchpoints')
+    lines.push('', c.bold('Manual touchpoints'), '')
 
     for (let step of plan.touchpoints) {
-      lines.push(`manual ${step.path} ${step.description}`)
+      lines.push(`${formatSectionLabel('manual')} ${c.path(step.path)}`)
+      lines.push(`${DETAIL_PREFIX}${c.dim(step.description)}`)
     }
   }
 
   if (Object.keys(plan.dependencies).length > 0) {
-    lines.push('', 'Dependencies')
+    lines.push('', c.bold('Dependencies'))
 
     for (let [name, version] of Object.entries(plan.dependencies)) {
-      lines.push(`dep    ${name}@${version}`)
+      lines.push(`${formatSectionLabel('dep')} ${name}@${version}`)
     }
   }
 
   if (plan.env.length > 0) {
-    lines.push('', 'Environment')
+    lines.push('', c.bold('Environment'))
 
     for (let name of plan.env) {
-      lines.push(`env    ${name}`)
+      lines.push(`${formatSectionLabel('env')} ${name}`)
     }
   }
 
@@ -110,10 +121,41 @@ export function renderInternalAddonInstallPlan(plan: InternalAddonInstallPlan) {
   let noops = countFiles(plan, 'noop')
   lines.push(
     '',
-    `Summary: ${creates} create, ${changes} change, ${noops} noop, ${plan.touchpoints.length} manual`,
+    `${c.bold('Summary')} ${c.bold(String(creates))} create, ${c.bold(String(changes))} change, ${c.bold(String(noops))} noop, ${c.bold(String(plan.touchpoints.length))} manual`,
   )
 
   return lines.join('\n')
+}
+
+function formatFileLabel(file: InternalAddonPlanFile) {
+  let label =
+    file.status === 'blocked'
+      ? 'blocked'
+      : file.effect === 'create'
+        ? 'create'
+        : file.effect === 'change'
+          ? 'change'
+          : 'noop'
+
+  let text = label.padEnd(LABEL_WIDTH)
+
+  if (file.status === 'blocked') {
+    return c.errorLabel(text)
+  }
+
+  if (file.effect === 'create') {
+    return c.success(text)
+  }
+
+  if (file.effect === 'change') {
+    return c.warn(text)
+  }
+
+  return c.dim(text)
+}
+
+function formatSectionLabel(label: string) {
+  return c.info(label.padEnd(LABEL_WIDTH))
 }
 
 async function getFileEffect(

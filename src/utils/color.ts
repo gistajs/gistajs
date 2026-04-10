@@ -2,12 +2,14 @@ import pc from 'picocolors'
 
 export const c = {
   brand: (s: string) => pc.bold(pc.cyan(s)),
-  success: (s: string) => pc.bold(s),
+  success: (s: string) => pc.bold(pc.green(s)),
   path: (s: string) => pc.underline(s),
   slug: (s: string) => pc.cyan(s),
   prompt: (s: string) => pc.bold(pc.yellow(s)),
   error: (s: string) => pc.red(s),
   errorLabel: (s: string) => pc.bold(pc.red(s)),
+  warn: (s: string) => pc.bold(pc.yellow(s)),
+  info: (s: string) => pc.bold(pc.cyan(s)),
   dim: (s: string) => pc.dim(s),
   bold: (s: string) => pc.bold(s),
 }

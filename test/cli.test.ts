@@ -121,7 +121,7 @@ describe('runCli', () => {
 
       expect(deps.stdout.log).toHaveBeenCalledOnce()
       expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
-        'Internal add-on plan: Storage (storage@2026-04-07-001)',
+        'Add-on plan Storage (storage@2026-04-07-001)',
       )
       expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
         'app/routes/storage/prepare.ts',
