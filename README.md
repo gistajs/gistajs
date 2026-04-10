@@ -12,6 +12,16 @@ npx gistajs create my-app --starter website --no-install --no-git
 Today the CLI covers project creation, starter diffs, pin management, Turso provisioning, and Vercel provisioning.
 For starters that define `pnpm prep`, `gistajs create` offers to run that setup step after dependencies install.
 
+### Add
+
+Plan a local add-on install against the current project:
+
+```bash
+npx gistajs add ./addons/storage --plan
+```
+
+`gistajs add` is planning-only right now. It prints the files that would be created or blocked, plus any manual touchpoints the host project needs to wire.
+
 ### Diff
 
 Compare the starter changes since your project's pinned release:

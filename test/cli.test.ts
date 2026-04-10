@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { CliDeps } from '../src/cli.js'
 import { main, runCli } from '../src/cli.js'
@@ -52,6 +55,91 @@ describe('runCli', () => {
     expect(deps.loadCatalog).not.toHaveBeenCalled()
     expect(deps.stdout.log).toHaveBeenCalledOnce()
     expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs diff')
+  })
+
+  it('prints add help for bare add invocation', async () => {
+    let deps = makeCliDeps()
+
+    await runCli(['add'], deps)
+
+    expect(deps.stdout.log).toHaveBeenCalledOnce()
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('gistajs add')
+    expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('--plan')
+  })
+
+  it('renders an add-on plan from a local manifest directory', async () => {
+    let root = await mkdtemp(join(tmpdir(), 'gistajs-cli-addon-plan-'))
+    let projectRoot = join(root, 'project')
+    let addonRoot = join(root, 'storage-addon')
+
+    try {
+      await mkdir(join(projectRoot, 'app/config'), { recursive: true })
+      await mkdir(join(projectRoot, 'app/routes/storage'), { recursive: true })
+      await mkdir(join(addonRoot, 'app/config'), { recursive: true })
+      await mkdir(join(addonRoot, 'app/routes/storage'), { recursive: true })
+
+      await writeFile(
+        join(addonRoot, 'gista.manifest.json'),
+        JSON.stringify(
+          {
+            id: 'internal:storage',
+            slug: 'storage',
+            name: 'Storage',
+            description: 'Storage',
+            release: '2026-04-07-001',
+            files: ['app/config/env.ts', 'app/routes/storage/prepare.ts'],
+            touchpoints: [
+              {
+                kind: 'config',
+                path: 'app/config/storage-attachables.ts',
+                description: 'define attachables',
+              },
+            ],
+          },
+          null,
+          2,
+        ) + '\n',
+      )
+
+      await writeFile(
+        join(addonRoot, 'app/config/env.ts'),
+        'export const x = 1\n',
+      )
+      await writeFile(
+        join(addonRoot, 'app/routes/storage/prepare.ts'),
+        "export const action = 'ok'\n",
+      )
+      await writeFile(
+        join(projectRoot, 'app/config/env.ts'),
+        'export const x = 2\n',
+      )
+
+      let deps = makeCliDeps({
+        cwd: projectRoot,
+      })
+
+      await runCli(['add', addonRoot, '--plan'], deps)
+
+      expect(deps.stdout.log).toHaveBeenCalledOnce()
+      expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
+        'Internal add-on plan: Storage (storage@2026-04-07-001)',
+      )
+      expect(deps.stdout.log.mock.calls[0]?.[0]).toContain(
+        'app/routes/storage/prepare.ts',
+      )
+      expect(deps.stdout.log.mock.calls[0]?.[0]).toContain('Manual touchpoints')
+    } finally {
+      let { rm } = await import('node:fs/promises')
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('requires --plan for add right now', async () => {
+    let deps = makeCliDeps()
+
+    await expect(runCli(['add', './storage-addon'], deps)).rejects.toThrow(
+      '`gistajs add` is planning-only right now. Re-run with --plan.',
+    )
   })
 
   it('dispatches latest diff from the project pin', async () => {

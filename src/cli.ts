@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { runAddCommand } from './commands/add.js'
 import { runCreateCommand } from './commands/create.js'
 import { runDiffCommand } from './commands/diff.js'
 import { UsageError } from './commands/error.js'
@@ -25,6 +26,16 @@ export async function runCli(argv = process.argv.slice(2), deps = defaultDeps) {
 
   if (command === 'create') {
     await runCreateCommand(rest, deps)
+    return
+  }
+
+  if (command === 'add') {
+    if (rest.length === 0 || rest[0] === '--help' || rest[0] === '-h') {
+      deps.stdout.log(getHelpText('add'))
+      return
+    }
+
+    await runAddCommand(rest, deps)
     return
   }
 

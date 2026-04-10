@@ -20,6 +20,22 @@ export function getHelpText(command?: string) {
     ].join('\n')
   }
 
+  if (command === 'add') {
+    return [
+      '',
+      header,
+      '',
+      `  ${c.bold('Usage:')}`,
+      `    ${c.dim('$')} ${c.bold('gistajs add')} <source> --plan`,
+      '',
+      `  ${c.bold('Examples:')}`,
+      `    ${c.dim('$')} gistajs add ./addons/storage --plan`,
+      '',
+      `  Planning only for now. ${c.bold('--plan')} prints file changes, collisions, and touchpoints without writing anything.`,
+      '',
+    ].join('\n')
+  }
+
   if (command === 'diff') {
     return [
       '',
@@ -78,6 +94,7 @@ export function getHelpText(command?: string) {
     '',
     `  ${c.bold('Usage:')}`,
     `    ${c.dim('$')} ${c.bold('gistajs create')} <project-name> [--starter <slug>] [--no-install] [--no-git]`,
+    `    ${c.dim('$')} ${c.bold('gistajs add')} <source> --plan`,
     `    ${c.dim('$')} ${c.bold('gistajs diff')} --latest [--stat]`,
     `    ${c.dim('$')} ${c.bold('gistajs diff')} <starter> <from-release-key> <to-release-key> [--stat]`,
     `    ${c.dim('$')} ${c.bold('gistajs pin')} <release-key>`,
@@ -86,6 +103,7 @@ export function getHelpText(command?: string) {
     `  ${c.bold('Examples:')}`,
     `    ${c.dim('$')} gistajs create my-app`,
     `    ${c.dim('$')} gistajs create my-app --starter website`,
+    `    ${c.dim('$')} gistajs add ./addons/storage --plan`,
     '',
     `  Some starters offer an optional setup step after dependencies install.`,
     '',
