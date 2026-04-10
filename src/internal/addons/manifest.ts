@@ -42,7 +42,7 @@ export function parseInternalAddonManifest(
       slug: readString(raw.slug, 'slug'),
       name: readString(raw.name, 'name'),
       description: readString(raw.description, 'description'),
-      version: readString(raw.version, 'version'),
+      release: readString(raw.release, 'release'),
       files,
       touchpoints,
       dependencies,

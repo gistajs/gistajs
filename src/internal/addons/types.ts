@@ -14,7 +14,7 @@ export type InternalAddonManifest = {
   slug: string
   name: string
   description: string
-  version: string
+  release: string
   files: InternalAddonFile[]
   touchpoints: InternalAddonTouchpoint[]
   dependencies: Record<string, string>
@@ -41,7 +41,7 @@ export type InternalAddonPlanFile = {
 export type InternalAddonInstallPlan = {
   addon: Pick<
     InternalAddonManifest,
-    'id' | 'slug' | 'name' | 'description' | 'version'
+    'id' | 'slug' | 'name' | 'description' | 'release'
   >
   projectRoot: string
   files: InternalAddonPlanFile[]

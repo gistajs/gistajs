@@ -31,7 +31,7 @@ describe('internal add-on manifest', () => {
       slug: 'storage',
       name: 'Storage',
       description: 'Storage',
-      version: '0.0.0',
+      release: '2026-04-07-001',
       files: [
         'app/.server/db/schema/storage.ts',
         'app/features/storage/config.ts',
@@ -106,7 +106,7 @@ describe('internal add-on manifest', () => {
         slug: 'storage',
         name: 'Storage',
         description: 'Storage',
-        version: '0.0.0',
+        release: '2026-04-07-001',
         files: ['app/features/storage/config.ts'],
       },
       '/tmp/storage/gista.manifest.json',
@@ -128,7 +128,7 @@ describe('internal add-on manifest', () => {
           slug: 'bad',
           name: 'Bad',
           description: 'Broken',
-          version: '0.0.0',
+          release: '2026-04-07-001',
           files: [
             {
               source: '../escape.ts',
@@ -150,7 +150,7 @@ describe('planInternalAddonInstall', () => {
       slug: 'storage',
       name: 'Storage',
       description: 'Storage',
-      version: '0.0.0',
+      release: '2026-04-07-001',
       files: [
         {
           source: 'app/config/env.ts',
@@ -211,7 +211,7 @@ describe('planInternalAddonInstall', () => {
       slug: 'storage',
       name: 'Storage',
       description: 'Storage',
-      version: '0.0.0',
+      release: '2026-04-07-001',
       files: [
         {
           source: 'app/models/upload.ts',
@@ -245,7 +245,9 @@ describe('planInternalAddonInstall', () => {
       effect: 'noop',
       status: 'ready',
     })
-    expect(output).toContain('Internal add-on plan: Storage (storage@0.0.0)')
+    expect(output).toContain(
+      'Internal add-on plan: Storage (storage@2026-04-07-001)',
+    )
     expect(output).toContain('noop')
     expect(output).toContain('Manual touchpoints')
     expect(output).toContain('Summary: 0 create, 0 change, 1 noop, 1 manual')
@@ -258,7 +260,7 @@ describe('planInternalAddonInstall', () => {
       slug: 'storage',
       name: 'Storage',
       description: 'Storage',
-      version: '0.0.0',
+      release: '2026-04-07-001',
       files: [
         {
           source: 'app/missing.ts',

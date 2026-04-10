@@ -51,7 +51,7 @@ export async function planInternalAddonInstall(
       slug: spec.manifest.slug,
       name: spec.manifest.name,
       description: spec.manifest.description,
-      version: spec.manifest.version,
+      release: spec.manifest.release,
     },
     projectRoot: root,
     files,
@@ -64,7 +64,7 @@ export async function planInternalAddonInstall(
 
 export function renderInternalAddonInstallPlan(plan: InternalAddonInstallPlan) {
   let lines = [
-    `Internal add-on plan: ${plan.addon.name} (${plan.addon.slug}@${plan.addon.version})`,
+    `Internal add-on plan: ${plan.addon.name} (${plan.addon.slug}@${plan.addon.release})`,
     '',
   ]
 
