@@ -109,7 +109,7 @@ describe('internal add-on manifest', () => {
         version: '0.0.0',
         files: ['app/features/storage/config.ts'],
       },
-      '/tmp/storage/gistajs.addon.json',
+      '/tmp/storage/gista.manifest.json',
     )
 
     expect(spec.manifest.files).toEqual([
@@ -136,7 +136,7 @@ describe('internal add-on manifest', () => {
             },
           ],
         },
-        '/tmp/bad/gistajs.addon.json',
+        '/tmp/bad/gista.manifest.json',
       ),
     ).toThrow('must stay within its root')
   })
@@ -296,7 +296,7 @@ async function prepareProjectRoot() {
 }
 
 async function writeManifest(root: string, manifest: Record<string, unknown>) {
-  let path = join(root, 'addon/gistajs.addon.json')
+  let path = join(root, 'addon/gista.manifest.json')
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`)
   return path
